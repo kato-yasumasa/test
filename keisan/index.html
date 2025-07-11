@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>計算マスター！</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <div id="start-screen" class="game-screen active">
+            <h1>計算マスター！</h1>
+            <button id="start-button">スタート</button>
+        </div>
+
+        <div id="game-screen" class="game-screen">
+            <div id="score-area">
+                <p>正解: <span id="correct-count">0</span> 問</p>
+                <div id="time-bar-container">
+                    <div id="time-bar"></div>
+                </div>
+            </div>
+            <div id="question-area">
+                <p id="question-text"></p>
+                <div id="result-feedback"></div>
+            </div>
+            <div id="floating-numbers-container">
+            </div>
+        </div>
+
+        <div id="result-screen" class="game-screen">
+            <h1>ゲーム終了！</h1>
+            <p id="final-score"></p>
+            <button id="restart-button">もう一度プレイ</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
