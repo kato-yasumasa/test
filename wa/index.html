@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WEB 輪投げゲーム</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #f0f8ff; /* 薄い水色 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        canvas {
+            border: 2px solid #333;
+            background-color: #aaddff; /* 空のような色 */
+            touch-action: none; /* タッチ操作でのスクロールを防止 */
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = window.innerWidth > 800 ? 800 : window.innerWidth * 0.9;
+        canvas.height = window.innerHeight > 600 ? 600 : window.innerHeight * 0.8;
+
+        // ゲームの状態
+        let score = 0;
+        let timeLeft = 30; // 秒
+        let gameActive = false; // ゲームがアクティブかどうか
+
+        // ターゲットの設定
+        const target = {
+            x: canvas.width / 2,
+            y: canvas.height / 2 - 50,
+            width: 80,
+            height: 80,
+            speed: 3, // ターゲットの移動速度
+            direction: 1 // 1:右, -1:左
+        };
+
+        // 輪っかの設定
+        const ring = {
+            x: 0,
+            y: 0,
+            radius: 30,
+            isThrown: false,
+            velX: 0,
+            velY: 0,
+            gravity: 0.5, // 重力
+            initialX: 50, // 輪の初期X座標
+            initialY: canvas.height - 50 // 輪の初期Y座標
+        };
+
+        // フリック操作のための変数
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchEndX = 0;
+        let touchEndY = 0;
+        let isDragging = false;
+
+        // ゲームの初期化
+        function initGame() {
+            score = 0;
+            timeLeft = 30;
+            gameActive = true;
+            ring.isThrown = false;
+            ring.x = ring.initialX;
+            ring.y = ring.initialY;
+            target.x = canvas.width / 2;
+            target.direction = 1;
+
+            // ゲーム開始と同時にタイマーを開始
+            if (timerInterval) clearInterval(timerInterval); // 前回のタイマーをクリア
+            timerInterval = setInterval(() => {
+                if (!gameActive) return;
+                timeLeft--;
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000); // 1秒ごとに実行
+        }
+
+        let timerInterval;
+
+        // ゲーム終了
+        function endGame() {
+            gameActive = false;
+            clearInterval(timerInterval);
+            drawGame(); // 最終状態を描画
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'white';
+            ctx.font = '48px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('ゲーム終了！', canvas.width / 2, canvas.height / 2 - 50);
+            ctx.fillText(`スコア: ${score}点`, canvas.width / 2, canvas.height / 2 + 10);
+            ctx.font = '24px Arial';
+            ctx.fillText('画面をタップして再スタート', canvas.width / 2, canvas.height / 2 + 70);
+        }
+
+
+        // 描画関数
+        function drawGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // ターゲットを描画
+            ctx.fillStyle = 'red';
+            ctx.fillRect(target.x - target.width / 2, target.y - target.height / 2, target.width, target.height);
+
+            // 輪っかを描画
+            ctx.strokeStyle = 'blue';
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.arc(ring.x, ring.y, ring.radius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // スコアとタイマーを描画
+            ctx.fillStyle = 'black';
+            ctx.font = '24px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText(`スコア: ${score}`, 10, 30);
+            ctx.textAlign = 'right';
+            ctx.fillText(`時間: ${timeLeft}秒`, canvas.width - 10, 30);
+
+            // 投擲軌道ガイドライン（ドラッグ中のみ表示）
+            if (isDragging && !ring.isThrown) {
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(ring.initialX, ring.initialY);
+                ctx.lineTo(touchEndX, touchEndY);
+                ctx.stroke();
+            }
+        }
+
+        // 更新関数 (ゲームロジック)
+        function update() {
+            if (!gameActive) return;
+
+            // ターゲットの移動
+            target.x += target.speed * target.direction;
+            if (target.x + target.width / 2 > canvas.width || target.x - target.width / 2 < 0) {
+                target.direction *= -1; // 壁に当たったら反転
+            }
+
+            // 輪っかの移動
+            if (ring.isThrown) {
+                ring.x += ring.velX;
+                ring.y += ring.velY;
+                ring.velY += ring.gravity; // 重力でY速度を増やす
+
+                // 輪っかが画面外に出たらリセット
+                if (ring.y > canvas.height + ring.radius || ring.x < -ring.radius || ring.x > canvas.width + ring.radius) {
+                    ring.isThrown = false;
+                    ring.x = ring.initialX;
+                    ring.y = ring.initialY;
+                }
+
+                // 当たり判定 (輪の中心とターゲットの中心間の距離)
+                const distanceX = Math.abs(ring.x - target.x);
+                const distanceY = Math.abs(ring.y - target.y);
+
+                // 簡単な矩形と円の衝突判定（ここでは四角いターゲットと円の輪っか）
+                // 輪っかの円がターゲットの四角に触れたかどうか
+                // 詳細な「くぐったか」「引っかかったか」は別途複雑な計算が必要
+                if (distanceX < (target.width / 2 + ring.radius) && distanceY < (target.height / 2 + ring.radius)) {
+                    // 当たった！と仮定
+                    if (ring.isThrown) { // 投げた瞬間の一度だけ判定
+                        score++;
+                        console.log('ヒット！スコア:', score);
+                        ring.isThrown = false; // 一度当たったら輪をリセット
+                        ring.x = ring.initialX;
+                        ring.y = ring.initialY;
+
+                        if (score >= 5) {
+                            endGame();
+                        }
+                    }
+                }
+            }
+        }
+
+        // ゲームループ
+        function gameLoop() {
+            update();
+            drawGame();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // タッチイベントリスナー
+        canvas.addEventListener('touchstart', (e) => {
+            if (!gameActive) {
+                // ゲーム終了時にタップで再スタート
+                initGame();
+                return;
+            }
+            if (ring.isThrown) return; // 輪が飛んでいる間は新しいフリックを受け付けない
+            isDragging = true;
+            touchStartX = e.touches[0].clientX - canvas.getBoundingClientRect().left;
+            touchStartY = e.touches[0].clientY - canvas.getBoundingClientRect().top;
+            touchEndX = touchStartX; // ドラッグ開始点と終了点を同じにする
+            touchEndY = touchStartY;
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (!gameActive || !isDragging || ring.isThrown) return;
+            touchEndX = e.touches[0].clientX - canvas.getBoundingClientRect().left;
+            touchEndY = e.touches[0].clientY - canvas.getBoundingClientRect().top;
+        });
+
+        canvas.addEventListener('touchend', (e) => {
+            if (!gameActive || !isDragging || ring.isThrown) {
+                isDragging = false;
+                return;
+            }
+            isDragging = false;
+
+            // フリックの距離と方向から速度を計算
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = touchEndY - touchStartY;
+
+            // 輪を投げる初期位置を固定
+            ring.x = ring.initialX;
+            ring.y = ring.initialY;
+
+            // フリックの逆方向に輪が飛ぶように速度を調整
+            // フリックが小さい場合は無視するか、最小速度を設定する
+            if (Math.sqrt(deltaX * deltaX + deltaY * deltaY) < 20) { // 20px以下のフリックは無視
+                return;
+            }
+
+            ring.velX = -deltaX * 0.1; // 0.1は速度調整の係数
+            ring.velY = -deltaY * 0.1 - 5; // Y方向は少し上向きに調整
+
+            ring.isThrown = true;
+        });
+
+        // PCでのマウス操作も可能にする (デバッグ用)
+        canvas.addEventListener('mousedown', (e) => {
+            if (!gameActive) {
+                initGame();
+                return;
+            }
+            if (ring.isThrown) return;
+            isDragging = true;
+            touchStartX = e.clientX - canvas.getBoundingClientRect().left;
+            touchStartY = e.clientY - canvas.getBoundingClientRect().top;
+            touchEndX = touchStartX;
+            touchEndY = touchStartY;
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!gameActive || !isDragging || ring.isThrown) return;
+            touchEndX = e.clientX - canvas.getBoundingClientRect().left;
+            touchEndY = e.clientY - canvas.getBoundingClientRect().top;
+        });
+
+        canvas.addEventListener('mouseup', (e) => {
+            if (!gameActive || !isDragging || ring.isThrown) {
+                isDragging = false;
+                return;
+            }
+            isDragging = false;
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = touchEndY - touchStartY;
+
+            if (Math.sqrt(deltaX * deltaX + deltaY * deltaY) < 20) {
+                return;
+            }
+
+            ring.x = ring.initialX;
+            ring.y = ring.initialY;
+            ring.velX = -deltaX * 0.1;
+            ring.velY = -deltaY * 0.1 - 5;
+            ring.isThrown = true;
+        });
+
+        // ゲーム開始
+        initGame();
+        gameLoop();
+
+    </script>
+</body>
+</html>
