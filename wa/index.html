@@ -80,7 +80,7 @@
         const ring = {
             x: 0,
             y: 0,
-            radius: 30,
+            radius: 30, // 輪の基準半径
             isThrown: false,
             velX: 0,
             velY: 0,
@@ -175,7 +175,11 @@
             ctx.strokeStyle = 'blue';
             ctx.lineWidth = 5;
             ctx.beginPath();
-            ctx.arc(ring.x, ring.y, ring.radius, 0, Math.PI * 2);
+            // 輪っかのY座標に応じて半径を調整
+            // Yが小さい（奥）ほど半径を小さくする
+            // 係数 (0.5) や加算値 (0.5) は調整してください
+            const scaledRingRadius = ring.radius * (0.5 + (ring.y / canvas.height) * 0.5);
+            ctx.arc(ring.x, ring.y, scaledRingRadius, 0, Math.PI * 2);
             ctx.stroke();
 
             // スコアとタイマーを描画
@@ -225,12 +229,16 @@
 
                 // 各ターゲットとの当たり判定
                 targets.forEach(t => {
+                    // 輪っかのY座標に応じた現在の半径を取得
+                    const currentRingRadius = ring.radius * (0.5 + (ring.y / canvas.height) * 0.5);
+
                     const distance = Math.sqrt(
                         Math.pow(ring.x - t.x, 2) + Math.pow(ring.y - t.y, 2)
                     );
 
                     // 輪っかの中心がターゲットの円の中心からターゲットの半径内にあればヒット
-                    if (distance < (t.baseSize / 2 + ring.radius / 4)) {
+                    // ここでの当たり判定も、縮小された輪っかのサイズを考慮
+                    if (distance < (t.baseSize / 2 + currentRingRadius / 4)) {
                         if (ring.isThrown) { // 投げた瞬間の一度だけ判定
                             score += t.points;
                             console.log(`ターゲット ${t.label} にヒット！+${t.points}点 スコア:`, score);
