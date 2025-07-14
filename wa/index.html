@@ -38,41 +38,41 @@
 
         // ターゲットの設定 (種類と得点、サイズ、簡易奥行き)
         const targets = [
-            // 小 (赤): 3点 - 奥に配置
+            // 一番奥 (小・赤): 3点
             {
                 id: 0,
                 x: canvas.width / 2,
                 y: canvas.height / 2 - 120, // 画面上部寄りに配置
-                baseSize: 60, // 基本サイズ (半径)
-                speed: 3,
+                baseSize: 60, // 小さい
+                speed: 3.5, // 少し速めに
                 direction: 1,
                 color: 'red',
                 points: 3,
-                label: '小 (赤)'
+                label: '小 (赤) - 3点'
             },
-            // 大 (黄): 2点 - 中央に配置
+            // 中央 (中・青): 2点
             {
                 id: 1,
                 x: canvas.width / 3,
                 y: canvas.height / 2, // 画面中央に配置
-                baseSize: 100, // 基本サイズ (半径)
-                speed: 2.5,
+                baseSize: 80, // 中くらい
+                speed: 2.8,
                 direction: -1,
-                color: 'gold', // 黄色に近い色
+                color: 'blue',
                 points: 2,
-                label: '大 (黄)'
+                label: '中 (青) - 2点'
             },
-            // 中 (青): 1点 - 手前に配置
+            // 一番手前 (大・黄): 1点
             {
                 id: 2,
                 x: canvas.width * 2 / 3,
                 y: canvas.height / 2 + 120, // 画面下部寄りに配置
-                baseSize: 80, // 基本サイズ (半径)
-                speed: 3.5,
+                baseSize: 100, // 大きい
+                speed: 2.2, // 少しゆっくりめに
                 direction: 1,
-                color: 'blue',
+                color: 'gold', // 黄色に近い色
                 points: 1,
-                label: '中 (青)'
+                label: '大 (黄) - 1点'
             }
         ];
 
@@ -106,12 +106,10 @@
             ring.y = ring.initialY;
 
             // 各ターゲットを初期位置に戻す
-            // Y座標に応じて初期X座標を少しずらすことで、見た目のバリエーションを増やす
             targets.forEach((t, index) => {
-                t.x = canvas.width / 2 + (index - 1) * 80;
+                t.x = canvas.width / 2 + (index - 1) * 80; // 適当な初期配置
                 t.direction = (index % 2 === 0) ? 1 : -1; // 交互に方向を初期化
             });
-
 
             // ゲーム開始と同時にタイマーを開始
             if (timerInterval) clearInterval(timerInterval); // 前回のタイマーをクリア
@@ -142,26 +140,21 @@
             ctx.fillText('画面をタップして再スタート', canvas.width / 2, canvas.height / 2 + 70);
         }
 
-
         // 描画関数
         function drawGame() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             // 各ターゲットを描画
-            // 描画順序を調整することで簡易的な奥行きを表現 (Y座標が大きいものを手前に)
             // Y座標でソートして、奥から手前へ描画することで重なり順を制御
             const sortedTargets = [...targets].sort((a, b) => a.y - b.y);
 
             sortedTargets.forEach(t => {
-                // 簡易的な奥行き表現: Y座標が小さい（奥にある）ほど小さく見せる
-                // ここでは単純にbaseSizeを使いますが、Y座標に応じて動的にサイズを変更することも可能
-                // 例: const currentSize = t.baseSize * (1 - (t.y / canvas.height) * 0.3); // Yが大きくなるほど小さく
-                const currentSize = t.baseSize; // 今回はbaseSize固定で、Y座標で位置と大きさを設定
+                const currentSize = t.baseSize; // baseSizeをそのまま半径として利用
 
                 ctx.fillStyle = t.color;
-                // ターゲットは円で描画して輪っか感を出す
+                // ターゲットは円で描画
                 ctx.beginPath();
-                ctx.arc(t.x, t.y, currentSize / 2, 0, Math.PI * 2); // baseSizeは直径として扱う
+                ctx.arc(t.x, t.y, currentSize / 2, 0, Math.PI * 2);
                 ctx.fill();
 
                 // ターゲットの縁も描画
@@ -171,13 +164,12 @@
                 ctx.arc(t.x, t.y, currentSize / 2, 0, Math.PI * 2);
                 ctx.stroke();
 
-                // 得点ラベルを表示 (デバッグ用やゲームのヒントとして)
+                // 得点ラベルを表示
                 ctx.fillStyle = 'white';
                 ctx.font = '16px Arial';
                 ctx.textAlign = 'center';
                 ctx.fillText(`${t.points}点`, t.x, t.y + currentSize / 2 + 15);
             });
-
 
             // 輪っかを描画
             ctx.strokeStyle = 'blue';
@@ -218,7 +210,6 @@
                 }
             });
 
-
             // 輪っかの移動
             if (ring.isThrown) {
                 ring.x += ring.velX;
@@ -233,24 +224,19 @@
                 }
 
                 // 各ターゲットとの当たり判定
-                // ポイントは「くぐった」時のみ加算されるようにする
                 targets.forEach(t => {
-                    // **より厳密な当たり判定と「くぐった」判定のロジックをここに追加する必要があります**
-                    // 現状は輪の中心がターゲットの円の範囲内に入ったらヒットとみなします
-                    // 「引っかかった」はまだ未実装ですが、輪の移動とターゲットの動きの相対的な関係で判断できます
                     const distance = Math.sqrt(
                         Math.pow(ring.x - t.x, 2) + Math.pow(ring.y - t.y, 2)
                     );
 
                     // 輪っかの中心がターゲットの円の中心からターゲットの半径内にあればヒット
-                    if (distance < (t.baseSize / 2 + ring.radius / 4)) { // ターゲットの円に入り始めたらヒット
+                    if (distance < (t.baseSize / 2 + ring.radius / 4)) {
                         if (ring.isThrown) { // 投げた瞬間の一度だけ判定
                             score += t.points;
                             console.log(`ターゲット ${t.label} にヒット！+${t.points}点 スコア:`, score);
                             ring.isThrown = false; // 一度当たったら輪をリセット
                             ring.x = ring.initialX;
                             ring.y = ring.initialY;
-                            // 輪がヒットした際に、ターゲットを点滅させるなどの視覚効果を追加すると良いでしょう
                         }
                     }
                 });
@@ -267,15 +253,14 @@
         // タッチイベントリスナー
         canvas.addEventListener('touchstart', (e) => {
             if (!gameActive) {
-                // ゲーム終了時にタップで再スタート
                 initGame();
                 return;
             }
-            if (ring.isThrown) return; // 輪が飛んでいる間は新しいフリックを受け付けない
+            if (ring.isThrown) return;
             isDragging = true;
             touchStartX = e.touches[0].clientX - canvas.getBoundingClientRect().left;
             touchStartY = e.touches[0].clientY - canvas.getBoundingClientRect().top;
-            touchEndX = touchStartX; // ドラッグ開始点と終了点を同じにする
+            touchEndX = touchStartX;
             touchEndY = touchStartY;
         });
 
@@ -292,24 +277,17 @@
             }
             isDragging = false;
 
-            // フリックの距離と方向から速度を計算
             const deltaX = touchEndX - touchStartX;
             const deltaY = touchEndY - touchStartY;
 
-            // 輪を投げる初期位置を固定
-            ring.x = ring.initialX;
-            ring.y = ring.initialY;
-
-            // フリックの逆方向に輪が飛ぶように速度を調整
-            // フリックが小さい場合は無視するか、最小速度を設定する
-            if (Math.sqrt(deltaX * deltaX + deltaY * deltaY) < 20) { // 20px以下のフリックは無視
+            if (Math.sqrt(deltaX * deltaX + deltaY * deltaY) < 20) {
                 return;
             }
 
-            // フリックの強さに応じて速度を調整
-            // Y方向は少し上向きに調整（放物線を描くため）
+            ring.x = ring.initialX;
+            ring.y = ring.initialY;
             ring.velX = -deltaX * 0.1;
-            ring.velY = -deltaY * 0.1 - 5;
+            ring.velY = -deltaY * 0.1 - 5; // Y方向は少し上向きに調整
 
             ring.isThrown = true;
         });
