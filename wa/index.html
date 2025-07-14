@@ -176,8 +176,6 @@
             ctx.lineWidth = 5;
             ctx.beginPath();
             // 輪っかのY座標に応じて半径を調整
-            // Yが小さい（奥）ほど半径を小さくする
-            // 係数 (0.5) や加算値 (0.5) は調整してください
             const scaledRingRadius = ring.radius * (0.5 + (ring.y / canvas.height) * 0.5);
             ctx.arc(ring.x, ring.y, scaledRingRadius, 0, Math.PI * 2);
             ctx.stroke();
@@ -237,7 +235,6 @@
                     );
 
                     // 輪っかの中心がターゲットの円の中心からターゲットの半径内にあればヒット
-                    // ここでの当たり判定も、縮小された輪っかのサイズを考慮
                     if (distance < (t.baseSize / 2 + currentRingRadius / 4)) {
                         if (ring.isThrown) { // 投げた瞬間の一度だけ判定
                             score += t.points;
@@ -258,7 +255,7 @@
             requestAnimationFrame(gameLoop);
         }
 
-        // タッチイベントリスナー
+        // --- タッチイベントリスナー ---
         canvas.addEventListener('touchstart', (e) => {
             if (!gameActive) {
                 initGame();
@@ -288,19 +285,26 @@
             const deltaX = touchEndX - touchStartX;
             const deltaY = touchEndY - touchStartY;
 
-            if (Math.sqrt(deltaX * deltaX + deltaY * deltaY) < 20) {
+            if (Math.sqrt(deltaX * deltaX + deltaY * deltaY) < 20) { // 短すぎるフリックは無視
                 return;
             }
 
             ring.x = ring.initialX;
             ring.y = ring.initialY;
-            ring.velX = -deltaX * 0.1;
-            ring.velY = -deltaY * 0.1 - 5; // Y方向は少し上向きに調整
+
+            // ★変更点: フリックした方向に輪が飛ぶようにする
+            // 係数 0.1 はフリックの強さを速度に変換する調整値です。
+            // 必要に応じて調整してください。
+            ring.velX = deltaX * 0.1;
+            ring.velY = deltaY * 0.1; // Y方向はフリックしたそのままの方向
+
+            // Y速度は重力の影響を受けるので、少し上向きに調整したい場合は以下のように変更
+            // ring.velY = deltaY * 0.1 - 5; // Y方向は少し上向きに調整
 
             ring.isThrown = true;
         });
 
-        // PCでのマウス操作も可能にする (デバッグ用)
+        // --- PCでのマウス操作も可能にする (デバッグ用) ---
         canvas.addEventListener('mousedown', (e) => {
             if (!gameActive) {
                 initGame();
@@ -335,8 +339,13 @@
 
             ring.x = ring.initialX;
             ring.y = ring.initialY;
-            ring.velX = -deltaX * 0.1;
-            ring.velY = -deltaY * 0.1 - 5;
+            // ★変更点: フリックした方向に輪が飛ぶようにする
+            ring.velX = deltaX * 0.1;
+            ring.velY = deltaY * 0.1; // Y方向はフリックしたそのままの方向
+
+            // Y速度は重力の影響を受けるので、少し上向きに調整したい場合は以下のように変更
+            // ring.velY = deltaY * 0.1 - 5; // Y方向は少し上向きに調整
+
             ring.isThrown = true;
         });
 
