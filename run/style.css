@@ -1,0 +1,15 @@
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    background-color: #222;
+    overflow: hidden;
+}
+
+canvas {
+    background-color: #000;
+    border: 2px solid #fff;
+    display: block; /* canvasの下に余白ができるのを防ぐ */
+}
