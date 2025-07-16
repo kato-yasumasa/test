@@ -167,8 +167,8 @@ document.addEventListener('DOMContentLoaded', () => {
     canvas.addEventListener('touchstart', (e) => {
         e.preventDefault(); // デフォルトのスクロール動作を防止
         isDragging = true;
-        touchStartX = e.touches[0].clientX;
-        touchStartY = e.touches[0].clientY;
+        touchStartX = e.touches()[0].clientX;
+        touchStartY = e.touches()[0].clientY;
         touchStartTime = Date.now();
     });
 
@@ -178,16 +178,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (Math.abs(ballVx) > 0.5 || Math.abs(ballVy) > 0.5) return;
 
         // ドラッグ中のボール位置をプレビューするならここで更新
-        // ballX = e.touches[0].clientX - canvas.getBoundingClientRect().left;
-        // ballY = e.touches[0].clientY - canvas.getBoundingClientRect().top;
+        // ballX = e.touches()[0].clientX - canvas.getBoundingClientRect().left;
+        // ballY = e.touches()[0].clientY - canvas.getBoundingClientRect().top;
         // draw(); // プレビュー描画のため
     });
 
     canvas.addEventListener('touchend', (e) => {
         if (!isDragging) return;
         isDragging = false;
-        touchEndX = e.changedTouches[0].clientX;
-        touchEndY = e.changedTouches[0].clientY;
+        touchEndX = e.changedTouches()[0].clientX;
+        touchEndY = e.changedTouches()[0].clientY;
         touchEndTime = Date.now();
 
         // ボールが動いている場合は再投球させない
@@ -206,7 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // フリック方向の正規化ベクトル
         const dirX = -deltaX / distance; // X軸は左右逆なので-を付ける
-        const dirY = -deltaY / distance; // 上方向はY減少なので-を付ける
+        const dirY = deltaY / distance; // Y軸はそのまま（上フリックでdeltaYは負）
 
         // ある程度のフリック距離がないと投げない
         if (distance > 20 && deltaTime < 0.5) { // 20px以上移動し、0.5秒以内
@@ -215,13 +215,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const speedMultiplier = 0.05; // 速度の調整係数
             ballVx = dirX * Math.min(velocity * speedMultiplier, maxSpeed);
             ballVy = dirY * Math.min(velocity * speedMultiplier, maxSpeed);
-
-            // 画面下から上へのフリックのみ有効にする（簡易的）
-            // if (touchStartY > touchEndY) {
-            //     ballVy = dirY * Math.min(velocity * speedMultiplier, maxSpeed);
-            // } else {
-            //     ballVy = 0; // 下方向へのフリックは無視
-            // }
         }
     });
 
