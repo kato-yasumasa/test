@@ -1,0 +1,34 @@
+body {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #f0f0f0;
+    font-family: Arial, sans-serif;
+    overflow: hidden; /* スマホでスクロールバーが出ないように */
+}
+
+#game-container {
+    border: 2px solid #333;
+    background-color: #fff;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+    position: relative; /* スコア表示を重ねるため */
+}
+
+canvas {
+    background-color: #8B4513; /* レーンの色（木目調） */
+    display: block; /* 余白をなくす */
+}
+
+#score-display {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    font-size: 1.2em;
+    color: #333;
+    padding: 5px 10px;
+    background-color: rgba(255, 255, 255, 0.8);
+    border-radius: 5px;
+}
