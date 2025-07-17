@@ -17,6 +17,7 @@
             background-color: #f0f0f0;
             font-family: 'Inter', sans-serif; /* フォントをInterに設定 */
             color: #333;
+            overflow: hidden; /* スマホでのスクロール防止 */
         }
 
         h1 {
@@ -26,15 +27,33 @@
             text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
         }
 
+        #time-bar-container {
+            width: 90%; /* 画面幅の90% */
+            max-width: 600px; /* 最大幅を設定 */
+            height: 20px;
+            background-color: #ccc;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            overflow: hidden;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        #time-bar-fill {
+            height: 100%;
+            width: 100%; /* 初期は100% */
+            background-color: #4CAF50; /* 緑色 */
+            border-radius: 10px;
+            transition: width 0.9s linear; /* 滑らかなアニメーション */
+            transform-origin: right; /* 右から左に縮む */
+        }
+
         #game-container {
             border: 4px solid #8B4513; /* 木目調の枠 */
             background-color: #fff;
             box-shadow: 0 8px 16px rgba(0,0,0,0.2);
             border-radius: 15px; /* 角を丸く */
-            /* overflow: hidden; /* 角丸に合わせて内容をクリップ */
             padding: 10px; /* 内側の余白 */
             position: relative; /* 選択ハイライト用 */
-            /* 幅と高さはJavaScriptで動的に設定 */
 
             /* Canvasを中央に配置するためのFlexbox設定を追加 */
             display: flex;
@@ -46,7 +65,12 @@
             display: block;
             background-color: #eee; /* タイルがない部分の背景色 */
             border-radius: 10px; /* Canvas自体も角を丸く */
+            /* 揺れアニメーションのトランジションはJavaScriptで制御するため削除 */
         }
+
+        /* パネルが揺れるアニメーションのCSSはJavaScriptで制御するため削除 */
+        /* .shaking, @keyframes shake は不要 */
+
 
         /* メッセージボックスのスタイル */
         #message-box {
@@ -81,15 +105,57 @@
             background-color: #45a049;
         }
 
-        /* ローディングメッセージのスタイルは、絵文字描画のため不要になりましたが、
-           念のためスタイルは残しておきます。HTMLからは削除されています。 */
-        #loading-message {
-            display: none; /* 常に非表示 */
+        /* ゲームオーバーポップアップのスタイル */
+        #game-over-popup {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            display: none; /* 初期状態では非表示 */
         }
+
+        #game-over-popup p {
+            color: white;
+            font-size: 3em;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(255,255,255,0.5);
+            margin-bottom: 30px;
+        }
+
+        #game-over-popup button {
+            background-color: #FF4500; /* OrangeRed */
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 1.5em;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            transition: background-color 0.3s ease, transform 0.1s ease;
+        }
+
+        #game-over-popup button:hover {
+            background-color: #CC3700;
+            transform: translateY(-2px);
+        }
+        #game-over-popup button:active {
+            transform: translateY(0);
+        }
+
     </style>
 </head>
 <body>
     <h1>３マッチパズル</h1>
+    <div id="time-bar-container">
+        <div id="time-bar-fill"></div>
+    </div>
     <div id="game-container">
         <canvas id="gameCanvas"></canvas>
     </div>
@@ -99,11 +165,10 @@
         <button id="message-button">OK</button>
     </div>
 
-    <!-- ローディングメッセージは絵文字描画のため不要になりました -->
-    <!-- <div id="loading-message">
-        <div class="spinner"></div>
-        <p>画像を読み込み中...</p>
-    </div> -->
+    <div id="game-over-popup">
+        <p id="game-over-text">GAME OVER</p>
+        <button id="play-again-button">もう一度プレイ</button>
+    </div>
 
     <script>
         // script.js の内容をここに直接記述
@@ -113,7 +178,9 @@
         const messageText = document.getElementById('message-text');
         const messageButton = document.getElementById('message-button');
         const gameContainer = document.getElementById('game-container');
-        // const loadingMessage = document.getElementById('loading-message'); // 不要になったためコメントアウト
+        const timeBarFill = document.getElementById('time-bar-fill');
+        const gameOverPopup = document.getElementById('game-over-popup');
+        const playAgainButton = document.getElementById('play-again-button');
 
         let TILE_SIZE; // 1タイルのサイズ (px) - 動的に計算される
         const GRID_COLS = 8; // グリッドの列数
@@ -122,15 +189,24 @@
         const SWAP_ANIMATION_DURATION = 200; // 入れ替えアニメーションの時間 (ms)
         const MATCH_FADE_DURATION = 300; // マッチ消去アニメーションの時間 (ms)
         const DROP_ANIMATION_DURATION = 400; // 落下アニメーションの時間 (ms)
+        
+        const MAX_GAME_TIME = 60; // ゲームの最大時間 (秒)
+        const TIME_BONUS_PER_MATCH = 3; // 1マッチで増える時間 (秒)
+        const LOW_TIME_THRESHOLD_RATIO = 0.1; // タイムバーが震え始める割合 (例: 0.1 = 10%)
 
         let gameBoard = []; // ゲームボードの状態を保持する二次元配列
         let selectedTile = null; // 選択されたタイル {row, col}
         let isProcessing = false; // アニメーション中や処理中かどうかのフラグ
+        let gameTime = MAX_GAME_TIME; // 現在の残り時間
+        let timeUpdateInterval = null; // setIntervalのID
+        let isGameOver = false; // ゲームオーバーフラグ
+        let isShaking = false; // パネルが震えているかどうかのフラグ
+        let shakeAnimationId = null; // 揺れアニメーションのrequestAnimationFrame ID
 
         // 各アイテムの絵文字を定義
         const fruitEmojis = [
             '🍎', // Apple
-            '🍌', // Banana
+            '�', // Banana
             '🍇', // Grape
             '🍊', // Orange
             '🍓'  // Strawberry
@@ -210,6 +286,8 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height); // キャンバスをクリア
 
             const excludeSet = new Set(excludeTiles.map(t => `${t.row},${t.col}`));
+            const shakeStrength = 2; // 揺れの強さ (ピクセル)
+            const shakeSpeed = 0.1; // 揺れの速度 (小さいほどゆっくり)
 
             for (let r = 0; r < GRID_ROWS; r++) {
                 for (let c = 0; c < GRID_COLS; c++) {
@@ -220,28 +298,46 @@
 
                     const itemType = gameBoard[r][c];
                     if (itemType !== null) {
+                        let offsetX = 0;
+                        let offsetY = 0;
+
+                        if (isShaking) {
+                            // 各タイルに異なる、時間で変化する揺れを適用
+                            // performance.now() を使うことで、時間経過で揺れが変化
+                            // r, c を加えることで、タイルごとに異なる揺れ方になる
+                            offsetX = Math.sin((performance.now() * shakeSpeed) + r * 1.2 + c * 0.8) * shakeStrength;
+                            offsetY = Math.cos((performance.now() * shakeSpeed) + r * 0.8 + c * 1.2) * shakeStrength;
+                        }
+
                         // タイルの背景色 (絵文字の背景として)
                         ctx.fillStyle = '#f8f8f8'; // 薄いグレー
-                        ctx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        ctx.fillRect(c * TILE_SIZE + offsetX, r * TILE_SIZE + offsetY, TILE_SIZE, TILE_SIZE);
 
                         ctx.globalAlpha = alpha; // 透明度を設定
                         ctx.font = `${TILE_SIZE * 0.7}px Arial`; // 絵文字のサイズを調整
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
-                        ctx.fillText(fruitEmojis[itemType], c * TILE_SIZE + TILE_SIZE / 2, r * TILE_SIZE + TILE_SIZE / 2);
+                        ctx.fillText(fruitEmojis[itemType], c * TILE_SIZE + TILE_SIZE / 2 + offsetX, r * TILE_SIZE + TILE_SIZE / 2 + offsetY);
                         ctx.globalAlpha = 1; // 透明度をリセット
 
                         // タイルの境界線
                         ctx.strokeStyle = '#333';
                         ctx.lineWidth = 1;
-                        ctx.strokeRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        ctx.strokeRect(c * TILE_SIZE + offsetX, r * TILE_SIZE + offsetY, TILE_SIZE, TILE_SIZE);
                     }
 
                     // 選択中のタイルをハイライト
                     if (selectedTile && selectedTile.row === r && selectedTile.col === c) {
+                        // ハイライトも揺れに追従させる
+                        let highlightOffsetX = 0;
+                        let highlightOffsetY = 0;
+                        if (isShaking) {
+                            highlightOffsetX = Math.sin((performance.now() * shakeSpeed) + r * 1.2 + c * 0.8) * shakeStrength;
+                            highlightOffsetY = Math.cos((performance.now() * shakeSpeed) + r * 0.8 + c * 1.2) * shakeStrength;
+                        }
                         ctx.strokeStyle = '#FFD700'; // 選択色 (ゴールド)
                         ctx.lineWidth = 4;
-                        ctx.strokeRect(c * TILE_SIZE + 2, r * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+                        ctx.strokeRect(c * TILE_SIZE + 2 + highlightOffsetX, r * TILE_SIZE + 2 + highlightOffsetY, TILE_SIZE - 4, TILE_SIZE - 4);
                     }
                 }
             }
@@ -256,7 +352,7 @@
          */
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault(); // デフォルトのスクロールなどを防止
-            if (isProcessing) return; // 処理中は入力を受け付けない
+            if (isProcessing || isGameOver) return; // 処理中またはゲームオーバー中は入力を受け付けない
 
             const touch = e.touches[0];
             touchStartX = touch.clientX;
@@ -281,7 +377,7 @@
          * @param {TouchEvent} e - タッチイベントオブジェクト
          */
         canvas.addEventListener('touchend', async (e) => {
-            if (!selectedTile || isProcessing) return;
+            if (!selectedTile || isProcessing || isGameOver) return; // 処理中またはゲームオーバー中は入力を受け付けない
 
             const touch = e.changedTouches[0];
             const touchEndX = touch.clientX;
@@ -326,6 +422,7 @@
                 // 入れ替え後のマッチ判定
                 const matches = findMatches();
                 if (matches.length > 0) {
+                    // addTime(TIME_BONUS_PER_MATCH); // ここでの時間追加は削除し、processGameCycle内で実行
                     await processGameCycle(); // マッチ処理、落下、補充、連鎖
                 } else {
                     // マッチしなかったら元に戻すアニメーション
@@ -347,6 +444,7 @@
             while (matchesFound) {
                 const matches = findMatches();
                 if (matches.length > 0) {
+                    addTime(TIME_BONUS_PER_MATCH); // 各マッチ（連鎖含む）で時間を追加
                     await animateMatchRemoval(matches); // マッチしたアイテムを消去アニメーション
                     dropTiles(); // アイテムを落下
                     await animateDrop(); // 落下アニメーション
@@ -580,10 +678,120 @@
             return new Promise(resolve => setTimeout(resolve, 200)); // 少し待つ
         }
 
-        // --- ゲームの初期設定と開始 ---
-        // Canvasのサイズを初期設定
-        calculateCanvasSize();
-        initBoard(); // 画像ロードは不要になったため、直接ボードを初期化
+        /**
+         * タイムバーの表示を更新します。
+         */
+        function updateTimeBarDisplay() {
+            const percentage = (gameTime / MAX_GAME_TIME) * 100;
+            timeBarFill.style.width = `${percentage}%`;
+
+            // タイムバーの色を時間に応じて変更
+            if (percentage > 50) {
+                timeBarFill.style.backgroundColor = '#4CAF50'; // 緑
+            } else if (percentage > 20) {
+                timeBarFill.style.backgroundColor = '#FFD700'; // 黄色
+            } else {
+                timeBarFill.style.backgroundColor = '#FF6347'; // 赤
+            }
+
+            // 残り時間が少ない場合にパネルを震わせる
+            if (gameTime <= MAX_GAME_TIME * LOW_TIME_THRESHOLD_RATIO && !isShaking) {
+                startShaking();
+            } else if (gameTime > MAX_GAME_TIME * LOW_TIME_THRESHOLD_RATIO && isShaking) {
+                stopShaking();
+            }
+        }
+
+        /**
+         * 時間を減らし、ゲームオーバーをチェックします。
+         */
+        function updateTime() {
+            gameTime--;
+            updateTimeBarDisplay();
+            if (gameTime <= 0) {
+                gameOver();
+            }
+        }
+
+        /**
+         * ゲームに時間を追加します。
+         * @param {number} amount - 追加する時間 (秒)
+         */
+        function addTime(amount) {
+            gameTime = Math.min(gameTime + amount, MAX_GAME_TIME);
+            updateTimeBarDisplay();
+        }
+
+        /**
+         * ゲームオーバー処理を実行します。
+         */
+        function gameOver() {
+            clearInterval(timeUpdateInterval); // タイマーを停止
+            stopShaking(); // 揺れを停止
+            isGameOver = true;
+            gameOverPopup.style.display = 'flex'; // ゲームオーバーポップアップを表示
+        }
+
+        /**
+         * パネルの揺れアニメーションを開始します。
+         */
+        function startShaking() {
+            isShaking = true;
+            if (!shakeAnimationId) { // 既にアニメーションが開始されていない場合のみ
+                function shakeLoop() {
+                    drawBoard(); // 揺れを反映するために再描画
+                    if (isShaking) { // isShakingがtrueの間だけループを続ける
+                        shakeAnimationId = requestAnimationFrame(shakeLoop);
+                    } else {
+                        shakeAnimationId = null; // ループ終了時にIDをクリア
+                    }
+                }
+                shakeAnimationId = requestAnimationFrame(shakeLoop);
+            }
+        }
+
+        /**
+         * パネルの揺れアニメーションを停止します。
+         */
+        function stopShaking() {
+            isShaking = false;
+            if (shakeAnimationId) {
+                cancelAnimationFrame(shakeAnimationId);
+                shakeAnimationId = null;
+            }
+            drawBoard(); // 揺れが止まった状態で一度描画し直す
+        }
+
+        /**
+         * ゲームを開始します。
+         */
+        function startGame() {
+            isGameOver = false;
+            gameTime = MAX_GAME_TIME; // 時間をリセット
+            gameOverPopup.style.display = 'none'; // ポップアップを非表示
+            updateTimeBarDisplay(); // タイムバーを初期化
+            if (timeUpdateInterval) clearInterval(timeUpdateInterval); // 既存のタイマーをクリア
+            timeUpdateInterval = setInterval(updateTime, 1000); // 1秒ごとに時間を更新
+            initBoard(); // ボードを初期化
+            // ゲーム開始時に揺れアニメーションは停止しておく
+            stopShaking();
+        }
+
+        /**
+         * ゲームをリセットして最初からプレイします。
+         */
+        function resetGame() {
+            // 既存のタイマーがあればクリア
+            if (timeUpdateInterval) {
+                clearInterval(timeUpdateInterval);
+            }
+            // 揺れアニメーションがあれば停止
+            stopShaking();
+            startGame(); // 新しいゲームを開始
+        }
+
+        // --- イベントリスナー ---
+        playAgainButton.addEventListener('click', resetGame);
 
         // ウィンドウのリサイズイベントに対応 (Canvasサイズを再設定し、再描画)
         window.addEventListener('resize', () => {
@@ -595,7 +803,7 @@
         let mouseStartX, mouseStartY;
         canvas.addEventListener('mousedown', (e) => {
             e.preventDefault();
-            if (isProcessing) return;
+            if (isProcessing || isGameOver) return; // 処理中またはゲームオーバー中は入力を受け付けない
 
             mouseStartX = e.clientX;
             mouseStartY = e.clientY;
@@ -613,7 +821,7 @@
         });
 
         canvas.addEventListener('mouseup', async (e) => {
-            if (!selectedTile || isProcessing) return;
+            if (!selectedTile || isProcessing || isGameOver) return; // 処理中またはゲームオーバー中は入力を受け付けない
 
             const dx = e.clientX - mouseStartX;
             const dy = e.clientY - mouseStartY;
@@ -642,6 +850,7 @@
 
                 const matches = findMatches();
                 if (matches.length > 0) {
+                    // addTime(TIME_BONUS_PER_MATCH); // ここでの時間追加は削除し、processGameCycle内で実行
                     await processGameCycle();
                 } else {
                     await animateSwap(targetTile, selectedTile);
@@ -654,6 +863,10 @@
             isProcessing = false;
         });
 
+        // --- ゲーム開始 ---
+        calculateCanvasSize(); // Canvasのサイズを初期設定
+        startGame(); // ゲームを初期化して開始
     </script>
 </body>
 </html>
+�
