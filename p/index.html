@@ -31,10 +31,15 @@
             background-color: #fff;
             box-shadow: 0 8px 16px rgba(0,0,0,0.2);
             border-radius: 15px; /* 角を丸く */
-            overflow: hidden; /* 角丸に合わせて内容をクリップ */
+            /* overflow: hidden; /* 角丸に合わせて内容をクリップ */
             padding: 10px; /* 内側の余白 */
             position: relative; /* 選択ハイライト用 */
             /* 幅と高さはJavaScriptで動的に設定 */
+
+            /* Canvasを中央に配置するためのFlexbox設定を追加 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
 
         canvas {
