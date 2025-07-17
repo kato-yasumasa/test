@@ -206,7 +206,7 @@
         // 各アイテムの絵文字を定義
         const fruitEmojis = [
             '🍎', // Apple
-            '�', // Banana
+            '🍌', // Banana
             '🍇', // Grape
             '🍊', // Orange
             '🍓'  // Strawberry
@@ -314,7 +314,8 @@
                         ctx.fillRect(c * TILE_SIZE + offsetX, r * TILE_SIZE + offsetY, TILE_SIZE, TILE_SIZE);
 
                         ctx.globalAlpha = alpha; // 透明度を設定
-                        ctx.font = `${TILE_SIZE * 0.7}px Arial`; // 絵文字のサイズを調整
+                        // 絵文字表示のフォントスタックを改善
+                        ctx.font = `${TILE_SIZE * 0.7}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", "Segoe UI Symbol", "Twemoji Mozilla", "EmojiOne Color", "Android Emoji", sans-serif`;
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
                         ctx.fillText(fruitEmojis[itemType], c * TILE_SIZE + TILE_SIZE / 2 + offsetX, r * TILE_SIZE + TILE_SIZE / 2 + offsetY);
@@ -422,7 +423,6 @@
                 // 入れ替え後のマッチ判定
                 const matches = findMatches();
                 if (matches.length > 0) {
-                    // addTime(TIME_BONUS_PER_MATCH); // ここでの時間追加は削除し、processGameCycle内で実行
                     await processGameCycle(); // マッチ処理、落下、補充、連鎖
                 } else {
                     // マッチしなかったら元に戻すアニメーション
@@ -507,7 +507,8 @@
                         ctx.fillStyle = '#f8f8f8'; // 薄いグレーの背景
                         ctx.fillRect(currentX, currentY, TILE_SIZE, TILE_SIZE);
 
-                        ctx.font = `${TILE_SIZE * 0.7}px Arial`;
+                        // 絵文字表示のフォントスタックを改善
+                        ctx.font = `${TILE_SIZE * 0.7}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", "Segoe UI Symbol", "Twemoji Mozilla", "EmojiOne Color", "Android Emoji", sans-serif`;
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
                         ctx.fillText(fruitEmojis[tile.type], currentX + TILE_SIZE / 2, currentY + TILE_SIZE / 2);
@@ -597,7 +598,8 @@
                         ctx.globalAlpha = alpha;
                         ctx.fillStyle = '#f8f8f8'; // 薄いグレーの背景
                         ctx.fillRect(tile.col * TILE_SIZE, tile.row * TILE_SIZE, TILE_SIZE, TILE_SIZE); // 背景を描画
-                        ctx.font = `${TILE_SIZE * 0.7}px Arial`;
+                        // 絵文字表示のフォントスタックを改善
+                        ctx.font = `${TILE_SIZE * 0.7}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", "Segoe UI Symbol", "Twemoji Mozilla", "EmojiOne Color", "Android Emoji", sans-serif`;
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
                         ctx.fillText(fruitEmojis[tile.originalType], tile.col * TILE_SIZE + TILE_SIZE / 2, tile.row * TILE_SIZE + TILE_SIZE / 2);
@@ -850,7 +852,6 @@
 
                 const matches = findMatches();
                 if (matches.length > 0) {
-                    // addTime(TIME_BONUS_PER_MATCH); // ここでの時間追加は削除し、processGameCycle内で実行
                     await processGameCycle();
                 } else {
                     await animateSwap(targetTile, selectedTile);
@@ -869,4 +870,3 @@
     </script>
 </body>
 </html>
-�
