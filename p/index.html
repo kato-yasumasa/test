@@ -81,6 +81,36 @@
             background-color: #45a049;
         }
 
+        /* ローディングメッセージのスタイル */
+        #loading-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 1.5em;
+            z-index: 1001;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
     </style>
 </head>
 <body>
@@ -94,6 +124,11 @@
         <button id="message-button">OK</button>
     </div>
 
+    <div id="loading-message">
+        <div class="spinner"></div>
+        <p>画像を読み込み中...</p>
+    </div>
+
     <script>
         // script.js の内容をここに直接記述
         const canvas = document.getElementById('gameCanvas');
@@ -102,6 +137,7 @@
         const messageText = document.getElementById('message-text');
         const messageButton = document.getElementById('message-button');
         const gameContainer = document.getElementById('game-container');
+        const loadingMessage = document.getElementById('loading-message');
 
         let TILE_SIZE; // 1タイルのサイズ (px) - 動的に計算される
         const GRID_COLS = 8; // グリッドの列数
@@ -115,14 +151,15 @@
         let selectedTile = null; // 選択されたタイル {row, col}
         let isProcessing = false; // アニメーション中や処理中かどうかのフラグ
 
-        // 各アイテムの色を定義 (画像がない場合の代替)
-        const itemColors = [
-            '#FF6347', // Tomato (赤系)
-            '#FFD700', // Gold (黄系)
-            '#6A5ACD', // SlateBlue (青系)
-            '#3CB371', // MediumSeaGreen (緑系)
-            '#DA70D6'  // Orchid (紫系)
+        // 各アイテムの画像ソースを定義 (placehold.co を使用)
+        const itemImageSources = [
+            'https://placehold.co/60x60/FF6347/FFFFFF?text=🍎', // Apple
+            'https://placehold.co/60x60/FFD700/000000?text=🍌', // Banana
+            'https://placehold.co/60x60/6A5ACD/FFFFFF?text=🍇', // Grape
+            'https://placehold.co/60x60/FFA500/FFFFFF?text=�', // Orange
+            'https://placehold.co/60x60/DC143C/FFFFFF?text=🍓'  // Strawberry
         ];
+        const itemImages = []; // ロードされたImageオブジェクトを格納
 
         // メッセージボックスを表示する関数 (alertの代替)
         function showMessageBox(message) {
@@ -201,8 +238,14 @@
                     const itemType = gameBoard[r][c];
                     if (itemType !== null) {
                         ctx.globalAlpha = alpha; // 透明度を設定
-                        ctx.fillStyle = itemColors[itemType]; // アイテムの色を設定
-                        ctx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE); // 四角形を描画
+                        const img = itemImages[itemType];
+                        if (img && img.complete) { // 画像がロード済みかチェック
+                            ctx.drawImage(img, c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        } else {
+                            // 画像がロードされていない場合のフォールバック (色付きの四角形)
+                            ctx.fillStyle = '#ccc'; // グレーの四角形
+                            ctx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        }
                         ctx.globalAlpha = 1; // 透明度をリセット
 
                         // タイルの境界線
@@ -304,7 +347,6 @@
                 } else {
                     // マッチしなかったら元に戻すアニメーション
                     await animateSwap(targetTile, selectedTile); // 元に戻す
-                    // showMessageBox("マッチしませんでした。"); // この行を削除
                 }
             } else {
                 selectedTile = null; // 無効なスワイプなら選択解除
@@ -376,14 +418,12 @@
                     drawBoard(); // 背景のボードをまず描画 (選択ハイライトなし)
 
                     animatedTiles.forEach(tile => {
-                        const currentX = tile.x + (tile.targetX - tile.x) * progress;
-                        const currentY = tile.y + (tile.targetY - tile.y) * progress;
-
-                        ctx.fillStyle = itemColors[tile.type];
-                        ctx.fillRect(currentX, currentY, TILE_SIZE, TILE_SIZE);
-                        ctx.strokeStyle = '#333';
-                        ctx.lineWidth = 1;
-                        ctx.strokeRect(currentX, currentY, TILE_SIZE, TILE_SIZE);
+                        const img = itemImages[tile.type];
+                        if (img && img.complete) {
+                            const currentX = tile.x + (tile.targetX - tile.x) * progress;
+                            const currentY = tile.y + (tile.targetY - tile.y) * progress;
+                            ctx.drawImage(img, currentX, currentY, TILE_SIZE, TILE_SIZE);
+                        }
                     });
 
                     if (progress < 1) {
@@ -462,11 +502,10 @@
                     // 消去対象のタイルだけ透明度を下げて描画
                     tilesToRemove.forEach(tile => {
                         ctx.globalAlpha = alpha;
-                        ctx.fillStyle = itemColors[tile.originalType];
-                        ctx.fillRect(tile.col * TILE_SIZE, tile.row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-                        ctx.strokeStyle = '#333';
-                        ctx.lineWidth = 1;
-                        ctx.strokeRect(tile.col * TILE_SIZE, tile.row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        const img = itemImages[tile.originalType];
+                        if (img && img.complete) {
+                            ctx.drawImage(img, tile.col * TILE_SIZE, tile.row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        }
                         ctx.globalAlpha = 1;
                     });
 
@@ -544,16 +583,51 @@
             return new Promise(resolve => setTimeout(resolve, 200)); // 少し待つ
         }
 
+        /**
+         * 画像を全てロードする関数
+         * @returns {Promise<void>} - 全ての画像がロードされた時に解決するPromise
+         */
+        function loadImages() {
+            loadingMessage.style.display = 'flex'; // ローディングメッセージを表示
+            const promises = itemImageSources.map((src, index) => {
+                return new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.src = src;
+                    img.onload = () => {
+                        itemImages[index] = img;
+                        resolve();
+                    };
+                    img.onerror = () => {
+                        console.error(`Failed to load image: ${src}`);
+                        // エラーが発生しても処理を続行するためにresolve
+                        // 実際にはエラーハンドリングを強化することも可能
+                        itemImages[index] = null; // ロード失敗した場合はnullを格納
+                        resolve();
+                    };
+                });
+            });
+            return Promise.all(promises).then(() => {
+                loadingMessage.style.display = 'none'; // ローディングメッセージを非表示
+            });
+        }
+
         // --- ゲームの初期設定と開始 ---
         // Canvasのサイズを初期設定
         calculateCanvasSize();
-        initBoard();
 
-        // ウィンドウのリサイズイベントに対応 (Canvasサイズを再設定し、再描画)
-        window.addEventListener('resize', () => {
-            calculateCanvasSize(); // サイズを再計算
-            drawBoard(); // 再描画
+        // 画像をロードしてからゲームを開始
+        loadImages().then(() => {
+            initBoard();
+            // ウィンドウのリサイズイベントに対応 (Canvasサイズを再設定し、再描画)
+            window.addEventListener('resize', () => {
+                calculateCanvasSize(); // サイズを再計算
+                drawBoard(); // 再描画
+            });
+        }).catch(error => {
+            console.error("Error loading images:", error);
+            showMessageBox("ゲームの開始に失敗しました。画像を読み込めませんでした。");
         });
+
 
         // マウスイベントも追加 (デバッグ用やPCでの操作用)
         let mouseStartX, mouseStartY;
@@ -609,7 +683,6 @@
                     await processGameCycle();
                 } else {
                     await animateSwap(targetTile, selectedTile);
-                    // showMessageBox("マッチしませんでした。"); // この行を削除
                 }
             } else {
                 selectedTile = null;
@@ -622,3 +695,4 @@
     </script>
 </body>
 </html>
+�
