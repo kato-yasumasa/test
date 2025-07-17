@@ -1,0 +1,193 @@
+/* 全体のリセットと基本的な設定 */
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #f0f0f0;
+    font-family: 'Arial', sans-serif;
+    overflow: hidden; /* ボードリロード時のタイルの飛び出しを防ぐ */
+}
+
+h1 {
+    margin-top: 20px;
+    margin-bottom: 20px;
+    color: #333;
+    font-size: 2em;
+}
+
+/* ゲーム情報（タイマーバー）のコンテナ */
+#game-info {
+    margin-bottom: 15px;
+    border-radius: 8px; /* 全体の角丸を維持 */
+    width: 100%; /* ゲームボードの幅に合わせるため、ここでは暫定的に100%に */
+    max-width: 480px; /* 例えばゲームボードが480pxならそれに合わせる */
+    text-align: center; /* タイマーバーを中央に配置 */
+}
+
+/* タイマーバーのコンテナ */
+#timer-bar-container {
+    width: 100%;
+    height: 20px; /* バーの高さ */
+    background-color: #ddd;
+    border-radius: 10px;
+    overflow: hidden; /* ★重要★ バーがはみ出さないようにクリップ */
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+    margin-top: 10px; /* タイトルとの間隔 */
+}
+
+/* タイマーバー本体 */
+#timer-bar {
+    height: 100%;
+    width: 100%; /* 初期値 */
+    background-color: #4CAF50; /* 緑色 */
+    border-radius: 10px;
+    transition: width 1s linear, background-color 0.5s ease-in-out; /* ★重要★ widthのトランジションを調整 */
+    transform-origin: left; /* バーが左から縮むように設定 */
+}
+
+#timer-bar.warning {
+    background-color: #FFC107; /* 黄色 */
+}
+
+#timer-bar.critical {
+    background-color: #DC3545; /* 赤色 */
+}
+
+/* ゲームコンテナ：ボードとオーバーレイをまとめる */
+#game-container {
+    position: relative; /* オーバーレイを重ねるために必要 */
+    width: fit-content; /* 中身に合わせて幅を調整 */
+    height: fit-content; /* 中身に合わせて高さを調整 */
+    box-shadow: 0 0 15px rgba(0,0,0,0.2);
+    border-radius: 8px;
+    overflow: hidden; /* 角丸のため */
+}
+
+/* ゲームボード（タイルの親）のスタイル */
+#game-board {
+    display: grid;
+    border: 5px solid #333;
+    background-color: #eee;
+    overflow: hidden; /* タイルがはみ出るのを防ぐ */
+    /* JavaScriptでgrid-template-columns, width, heightを設定します */
+}
+
+/* 各動物タイルのスタイル */
+.animal-tile {
+    width: 60px; /* タイルのサイズ */
+    height: 60px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 36px; /* 動物の絵文字のサイズ */
+    cursor: pointer;
+    box-sizing: border-box; /* borderを含めてwidth/heightを計算 */
+    border: 1px solid #ccc;
+    background-color: #fff;
+    user-select: none; /* テキスト選択を無効にする */
+
+    /* アニメーション用トランジション */
+    transition: transform 0.3s ease-out, opacity 0.3s ease-out; 
+    transform: scale(1);
+    opacity: 1;
+    border-radius: 4px;
+}
+
+/* 選択されたタイルに適用されるスタイル */
+.animal-tile.selected {
+    border: 3px solid #007bff;
+    box-shadow: 0 0 10px rgba(0, 123, 255, 0.7);
+    z-index: 10; /* 最前面に表示 */
+}
+
+/* 消えるタイルに適用されるスタイル */
+.animal-tile.clearing {
+    transform: scale(0); /* 縮小 */
+    opacity: 0;          /* フェードアウト */
+}
+
+/* ゲームオーバーオーバーレイのスタイル */
+#game-over-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7); /* 半透明の黒 */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-size: 3em;
+    font-weight: bold;
+    text-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+    z-index: 20; /* ゲームボードより手前に表示 */
+    border-radius: 8px;
+}
+
+#game-over-message {
+    margin-bottom: 20px;
+}
+
+#restart-button {
+    padding: 15px 30px;
+    font-size: 1.2em;
+    background-color: #28a745; /* 緑色のボタン */
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out;
+}
+
+#restart-button:hover {
+    background-color: #218838; /* ホバーで少し濃く */
+}
+
+/* 隠すためのクラス */
+.hidden {
+    display: none !important;
+}
+
+/* 新しいタイルが落下してくるためのアニメーション */
+.animal-tile.falling {
+    animation: fallAndAppear 0.5s ease-out forwards; /* CSSアニメーションを適用 */
+}
+
+@keyframes fallAndAppear {
+    0% {
+        transform: translateY(-480px) scale(0.5); /* ボードの高さ分上から、小さく開始 */
+        opacity: 0;
+    }
+    100% {
+        transform: translateY(0) scale(1); /* 通常サイズに */
+        opacity: 1;
+    }
+}
+
+/* タイルが落ちて消えるアニメーション */
+.animal-tile.drop-off {
+    animation: dropAndFade 0.5s ease-in forwards var(--drop-delay, 0s);
+}
+
+@keyframes dropAndFade {
+    0% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(480px); /* ボードの高さ分下に落ちる */
+        opacity: 0;
+    }
+}
