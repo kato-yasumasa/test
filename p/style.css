@@ -5,6 +5,10 @@ html, body {
     width: 100%;
     height: 100%;
     box-sizing: border-box;
+    /* 新規追加: CSS変数 --tile-size の初期値を設定（JavaScriptで上書きされる）*/
+    /* 新規追加: CSS変数 --board-size-px の初期値を設定（JavaScriptで上書きされる）*/
+    --tile-size: 60px;
+    --board-size-px: 480px; /* 8 * 60px */
 }
 
 body {
@@ -28,49 +32,49 @@ h1 {
 /* ゲーム情報（タイマーバー）のコンテナ */
 #game-info {
     margin-bottom: 15px;
-    border-radius: 8px; /* 全体の角丸を維持 */
-    width: 100%; /* ゲームボードの幅に合わせるため、ここでは暫定的に100%に */
-    max-width: 480px; /* 例えばゲームボードが480pxならそれに合わせる */
-    text-align: center; /* タイマーバーを中央に配置 */
+    border-radius: 8px;
+    width: 100%;
+    max-width: var(--board-size-px); /* CSS変数を使用 */
+    text-align: center;
 }
 
 /* タイマーバーのコンテナ */
 #timer-bar-container {
     width: 100%;
-    height: 20px; /* バーの高さ */
+    height: 20px;
     background-color: #ddd;
     border-radius: 10px;
-    overflow: hidden; /* ★重要★ バーがはみ出さないようにクリップ */
+    overflow: hidden;
     box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
-    margin-top: 10px; /* タイトルとの間隔 */
+    margin-top: 10px;
 }
 
 /* タイマーバー本体 */
 #timer-bar {
     height: 100%;
-    width: 100%; /* 初期値 */
-    background-color: #4CAF50; /* 緑色 */
+    width: 100%;
+    background-color: #4CAF50;
     border-radius: 10px;
-    transition: width 1s linear, background-color 0.5s ease-in-out; /* ★重要★ widthのトランジションを調整 */
-    transform-origin: left; /* バーが左から縮むように設定 */
+    transition: width 1s linear, background-color 0.5s ease-in-out;
+    transform-origin: left;
 }
 
 #timer-bar.warning {
-    background-color: #FFC107; /* 黄色 */
+    background-color: #FFC107;
 }
 
 #timer-bar.critical {
-    background-color: #DC3545; /* 赤色 */
+    background-color: #DC3545;
 }
 
 /* ゲームコンテナ：ボードとオーバーレイをまとめる */
 #game-container {
-    position: relative; /* オーバーレイを重ねるために必要 */
-    width: fit-content; /* 中身に合わせて幅を調整 */
-    height: fit-content; /* 中身に合わせて高さを調整 */
+    position: relative;
+    width: var(--board-size-px); /* CSS変数を使用 */
+    height: var(--board-size-px); /* CSS変数を使用 */
     box-shadow: 0 0 15px rgba(0,0,0,0.2);
     border-radius: 8px;
-    overflow: hidden; /* 角丸のため */
+    overflow: hidden;
 }
 
 /* ゲームボード（タイルの親）のスタイル */
@@ -78,42 +82,42 @@ h1 {
     display: grid;
     border: 5px solid #333;
     background-color: #eee;
-    overflow: hidden; /* タイルがはみ出るのを防ぐ */
-    /* JavaScriptでgrid-template-columns, width, heightを設定します */
+    overflow: hidden;
+    /* grid-template-columns, width, height はJavaScriptで設定されます */
 }
 
 /* 各動物タイルのスタイル */
 .animal-tile {
-    width: 60px; /* タイルのサイズ */
-    height: 60px;
+    width: var(--tile-size); /* CSS変数を使用 */
+    height: var(--tile-size); /* CSS変数を使用 */
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 36px; /* 動物の絵文字のサイズ */
+    font-size: calc(var(--tile-size) * 0.6); /* CSS変数を使用してフォントサイズを調整 */
     cursor: pointer;
-    box-sizing: border-box; /* borderを含めてwidth/heightを計算 */
+    box-sizing: border-box;
     border: 1px solid #ccc;
     background-color: #fff;
-    user-select: none; /* テキスト選択を無効にする */
+    user-select: none;
 
-    /* アニメーション用トランジション */
     transition: transform 0.3s ease-out, opacity 0.3s ease-out; 
     transform: scale(1);
     opacity: 1;
     border-radius: 4px;
+    position: absolute; /* タイルの位置を absolute にして transform で制御 */
 }
 
 /* 選択されたタイルに適用されるスタイル */
 .animal-tile.selected {
     border: 3px solid #007bff;
     box-shadow: 0 0 10px rgba(0, 123, 255, 0.7);
-    z-index: 10; /* 最前面に表示 */
+    z-index: 10;
 }
 
 /* 消えるタイルに適用されるスタイル */
 .animal-tile.clearing {
-    transform: scale(0); /* 縮小 */
-    opacity: 0;          /* フェードアウト */
+    transform: scale(0);
+    opacity: 0;
 }
 
 /* ゲームオーバーオーバーレイのスタイル */
@@ -123,7 +127,7 @@ h1 {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.7); /* 半透明の黒 */
+    background-color: rgba(0, 0, 0, 0.7);
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -132,7 +136,7 @@ h1 {
     font-size: 3em;
     font-weight: bold;
     text-shadow: 2px 2px 5px rgba(0,0,0,0.5);
-    z-index: 20; /* ゲームボードより手前に表示 */
+    z-index: 20;
     border-radius: 8px;
 }
 
@@ -143,7 +147,7 @@ h1 {
 #restart-button {
     padding: 15px 30px;
     font-size: 1.2em;
-    background-color: #28a745; /* 緑色のボタン */
+    background-color: #28a745;
     color: white;
     border: none;
     border-radius: 5px;
@@ -152,7 +156,7 @@ h1 {
 }
 
 #restart-button:hover {
-    background-color: #218838; /* ホバーで少し濃く */
+    background-color: #218838;
 }
 
 /* 隠すためのクラス */
@@ -162,16 +166,17 @@ h1 {
 
 /* 新しいタイルが落下してくるためのアニメーション */
 .animal-tile.falling {
-    animation: fallAndAppear 0.5s ease-out forwards; /* CSSアニメーションを適用 */
+    /* --board-size-px を使ってアニメーションの開始位置を動的に設定 */
+    animation: fallAndAppear 0.5s ease-out forwards;
 }
 
 @keyframes fallAndAppear {
     0% {
-        transform: translateY(-480px) scale(0.5); /* ボードの高さ分上から、小さく開始 */
+        transform: translateY(calc(var(--board-size-px) * -1)) scale(0.5); /* ボードの高さ分上から */
         opacity: 0;
     }
     100% {
-        transform: translateY(0) scale(1); /* 通常サイズに */
+        transform: translateY(0) scale(1);
         opacity: 1;
     }
 }
@@ -187,7 +192,8 @@ h1 {
         opacity: 1;
     }
     100% {
-        transform: translateY(480px); /* ボードの高さ分下に落ちる */
+        /* --board-size-px を使ってアニメーションの終了位置を動的に設定 */
+        transform: translateY(var(--board-size-px)); /* ボードの高さ分下に落ちる */
         opacity: 0;
     }
 }

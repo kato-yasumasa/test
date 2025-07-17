@@ -2,54 +2,100 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     const gameBoard = document.getElementById('game-board');
-    // timeDisplay および timerElement はHTMLから削除されたため、ここでは使用しません
-    const timerBarContainer = document.getElementById('timer-bar-container'); // タイマーバーのコンテナ要素
-    const timerBar = document.getElementById('timer-bar'); // タイマーバーの要素
+    const timerBarContainer = document.getElementById('timer-bar-container');
+    const timerBar = document.getElementById('timer-bar');
     const gameOverOverlay = document.getElementById('game-over-overlay');
     const restartButton = document.getElementById('restart-button');
 
-    const BOARD_SIZE = 8; // 8x8のボード
-    const TILE_SIZE = 60; // タイルのサイズ (px)
-    const ANIMATION_DURATION_MS = 300; // アニメーションの時間（0.3秒）
-    const INITIAL_TIME = 60; // 初期制限時間（秒）
-    const TIME_BONUS_PER_TILE = 0.5; // 消したタイル1個あたりに増える時間（秒）
-    const TILE_TYPES = 6; // 動物の種類数
-    const animals = ['🍎', '🍌', '🍓', '🍇', '🍍', '🍊']; // 動物の絵文字 (果物に変更済み)
+    const BOARD_SIZE = 8;
+    // TILE_SIZE は動的に計算するため、ここでは初期値としてのみ残します。
+    // 実際には updateBoardDimensions で計算されます。
+    let TILE_SIZE = 60; // 基本となるタイルのサイズ
 
-    let board = []; // 内部のボード状態（動物のタイプIDを保持）
-    let selectedTile = null; // 選択中のタイル
-    let isProcessing = false; // 処理中のフラグ。連続クリック防止
-    
-    let timeLeft = INITIAL_TIME; // 残り時間
-    let timerInterval; // setIntervalのIDを保持
+    const ANIMATION_DURATION_MS = 300;
+    const INITIAL_TIME = 60;
+    const TIME_BONUS_PER_TILE = 0.5;
+    const TILE_TYPES = 6;
+    const animals = ['🍎', '🍌', '🍓', '🍇', '🍍', '🍊'];
 
-    let isGameOver = false; // ゲームオーバー状態を追跡
+    let board = [];
+    let selectedTile = null;
+    let isProcessing = false;
+
+    let timeLeft = INITIAL_TIME;
+    let timerInterval;
+
+    let isGameOver = false;
 
     // ゲーム初期設定（DOMロード時に一度だけ実行）
     function setupGame() {
-        gameBoard.style.width = `${BOARD_SIZE * TILE_SIZE}px`;
-        gameBoard.style.height = `${BOARD_SIZE * TILE_SIZE}px`;
-        gameBoard.style.gridTemplateColumns = `repeat(${BOARD_SIZE}, ${TILE_SIZE}px)`;
+        // ここでボードのサイズを計算し、CSS変数として設定
+        updateBoardDimensions();
+        // ウィンドウのリサイズ時にもボードサイズを更新
+        window.addEventListener('resize', updateBoardDimensions);
         
-        // リスタートボタンのイベントリスナーはここで設定
         restartButton.addEventListener('click', startGame); 
         
-        startGame(); // DOMロード時にゲームを即開始
+        startGame();
     }
 
-    // ゲーム開始処理
+    // ボードの寸法を更新する関数
+    function updateBoardDimensions() {
+        const gameContainer = document.getElementById('game-container'); // game-container要素を取得
+
+        // 画面の短い辺（幅または高さ）に基づいてタイルサイズを計算
+        // 縦長のスマホ画面では幅、横長のタブレット画面では高さが基準になりやすい
+        const minScreenDimension = Math.min(window.innerWidth, window.innerHeight);
+        // パディングや余白を考慮し、ボードが画面の80%程度を占めるように調整
+        // 10pxはgame-containerのbox-shadowやborder-radiusなどを考慮した余裕
+        TILE_SIZE = Math.floor((minScreenDimension * 0.8 - 10) / BOARD_SIZE);
+        // 最小・最大サイズを設定することも可能（例: TILE_SIZE = Math.max(40, Math.min(80, calculatedSize));）
+        TILE_SIZE = Math.max(40, Math.min(80, TILE_SIZE)); // 最小40px、最大80pxに制限
+
+        const boardPxSize = BOARD_SIZE * TILE_SIZE;
+
+        gameBoard.style.width = `${boardPxSize}px`;
+        gameBoard.style.height = `${boardPxSize}px`;
+        gameBoard.style.gridTemplateColumns = `repeat(${BOARD_SIZE}, ${TILE_SIZE}px)`;
+
+        // style.css の .animal-tile にも TILE_SIZE を反映させるためのCSS変数
+        document.documentElement.style.setProperty('--tile-size', `${TILE_SIZE}px`);
+        document.documentElement.style.setProperty('--board-size-px', `${boardPxSize}px`); // CSSアニメーション用
+
+        // タイマーバーの幅もボードサイズに合わせる
+        if (timerBarContainer) { // timerBarContainerが存在することを確認
+            timerBarContainer.style.maxWidth = `${boardPxSize}px`;
+        }
+        if (gameContainer) { // gameContainerの幅もボードサイズに合わせる
+            gameContainer.style.width = `${boardPxSize}px`;
+            gameContainer.style.height = `${boardPxSize}px`;
+        }
+
+        // 既存のタイル要素があれば、新しいサイズに合わせて位置を更新
+        // (initializeBoardやreloadBoardの後に呼ばれることを想定)
+        Array.from(gameBoard.children).forEach(tile => {
+            const row = parseInt(tile.dataset.row);
+            const col = parseInt(tile.dataset.col);
+            tile.style.width = `${TILE_SIZE}px`;
+            tile.style.height = `${TILE_SIZE}px`;
+            tile.style.fontSize = `${TILE_SIZE * 0.6}px`; // フォントサイズも調整
+            tile.style.transform = `translate(${col * TILE_SIZE}px, ${row * TILE_SIZE}px)`;
+        });
+    }
+
+
     async function startGame() {
         isProcessing = false; 
-        isGameOver = false; // ゲームオーバー状態をリセット
+        isGameOver = false;
 
-        timeLeft = INITIAL_TIME; // 残り時間を初期値にリセット
-        selectedTile = null; // 選択中のタイルをリセット
+        timeLeft = INITIAL_TIME;
+        selectedTile = null;
         
-        updateTimerBar(); // タイマーバーの表示を初期状態にリセット
-        gameOverOverlay.classList.add('hidden'); // ゲームオーバー画面を隠す
+        updateTimerBar();
+        gameOverOverlay.classList.add('hidden');
 
-        clearInterval(timerInterval); // 既存のタイマーをクリア
-        timerInterval = setInterval(updateTimer, 1000); // 1秒ごとにタイマー更新
+        clearInterval(timerInterval);
+        timerInterval = setInterval(updateTimer, 1000);
 
         isProcessing = true; 
         await initializeBoard(); 
@@ -59,7 +105,6 @@ document.addEventListener('DOMContentLoaded', () => {
         scheduleStalemateCheck(); 
     }
 
-    // ゲームボードの初期化 (DOM生成とアニメーション)
     async function initializeBoard() {
         gameBoard.innerHTML = ''; 
         board = createInitialBoardData(); 
@@ -71,7 +116,6 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("Board initialized and ready!");
     }
 
-    // マッチがないことを確認しながら初期ボードデータを生成する関数
     function createInitialBoardData() {
         let newBoard = [];
         for (let r = 0; r < BOARD_SIZE; r++) {
@@ -90,7 +134,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return newBoard;
     }
 
-    // タイマー更新関数
     function updateTimer() {
         if (isGameOver) return; 
 
@@ -99,13 +142,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (timeLeft <= 0) {
             timeLeft = 0; 
             updateTimerBar(); 
-            endGame(); // バーを完全に0に更新してからゲームオーバー
+            endGame();
         } else {
             updateTimerBar(); 
         }
     }
 
-    // タイマーバーを更新する関数
     function updateTimerBar() {
         const percentage = (timeLeft / INITIAL_TIME) * 100;
         timerBar.style.width = `${Math.max(0, percentage)}%`; 
@@ -118,7 +160,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 時間を追加する関数
     function addTime(amount) {
         timeLeft += amount;
         if (timeLeft > INITIAL_TIME) { 
@@ -127,7 +168,6 @@ document.addEventListener('DOMContentLoaded', () => {
         updateTimerBar(); 
     }
 
-    // ゲーム終了処理
     function endGame() {
         if (isGameOver) return; 
 
@@ -135,29 +175,18 @@ document.addEventListener('DOMContentLoaded', () => {
         isProcessing = false; 
         clearInterval(timerInterval); 
         
-        // ★追加・変更点★
-        // トランジションを一時的に無効にして、すぐに幅を0にする
-        timerBar.style.transition = 'none'; // トランジションを無効化
-        timerBar.style.width = '0%'; // 強制的に0%に設定
-        timerBar.classList.remove('warning', 'critical'); // 色もリセット
+        timerBar.style.transition = 'none';
+        timerBar.style.width = '0%';
+        timerBar.classList.remove('warning', 'critical');
         
-        // 次のフレームでトランジションを元に戻す（リスタート時のアニメーションのため）
-        // これにより、すぐに画面が表示され、見た目の問題が解決されます
         setTimeout(() => {
             timerBar.style.transition = 'width 1s linear, background-color 0.5s ease-in-out';
-        }, 50); // 短い遅延を入れてブラウザに再描画させる時間を与える
+        }, 50);
 
         gameOverOverlay.classList.remove('hidden'); 
         console.log("Game Over!");
     }
 
-
-    // 以下、その他の関数は変更なし
-    // createTileElement, updateFullBoardDOM, handleTileClick, animateSwapDOM,
-    // checkMatchesWrapper, checkMatches, clearTiles, dropTiles,
-    // animateBoardReload, scheduleStalemateCheck, hasPossibleMoves,
-    // checkMatchesOnBoard, reloadBoard
-    // は、上記の変更には影響しないため、そのまま記述します。
 
     function createTileElement(row, col, type) {
         const tile = document.createElement('div');
@@ -166,17 +195,26 @@ document.addEventListener('DOMContentLoaded', () => {
         tile.dataset.col = col;
         tile.textContent = animals[type];
         tile.addEventListener('click', handleTileClick);
+        // 動的に計算された TILE_SIZE を適用
+        tile.style.width = `${TILE_SIZE}px`;
+        tile.style.height = `${TILE_SIZE}px`;
+        tile.style.fontSize = `${TILE_SIZE * 0.6}px`; // フォントサイズも調整
         return tile;
     }
 
     function updateFullBoardDOM() {
+        // gameBoardの子要素を一度すべて削除
         Array.from(gameBoard.children).forEach(tile => gameBoard.removeChild(tile));
         
+        // 新しい（または更新された）ボード状態に基づいてDOMを再構築
         for (let r = 0; r < BOARD_SIZE; r++) {
             for (let c = 0; c < BOARD_SIZE; c++) {
                 const type = board[r][c];
                 if (type !== null) { 
-                    gameBoard.appendChild(createTileElement(r, c, type));
+                    const tileDiv = createTileElement(r, c, type);
+                    gameBoard.appendChild(tileDiv);
+                    // 位置はCSS transformで設定
+                    tileDiv.style.transform = `translate(${c * TILE_SIZE}px, ${r * TILE_SIZE}px)`;
                 }
             }
         }
@@ -215,6 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 [board[row][col], board[prevRow][prevCol]] = [board[prevRow][prevCol], board[row][col]];
                 
+                // DOM要素の入れ替えアニメーション
                 await animateSwapDOM(prevRow, prevCol, row, col);
 
                 const matchesFoundDuringChain = await checkMatchesWrapper(); 
@@ -222,6 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!matchesFoundDuringChain) { 
                     console.log('No match after swap, rolling back.');
                     board = boardBeforeSwap; 
+                    // ロールバックのアニメーション
                     await animateSwapDOM(row, col, prevRow, prevCol); 
                 }
                 
@@ -238,18 +278,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!tile1 || !tile2) {
             console.error("Missing tile during swap DOM animation. Forcing full board update.");
-            updateFullBoardDOM(); 
+            updateFullBoardDOM(); // 強制的にボード全体を更新
+            await new Promise(resolve => setTimeout(resolve, ANIMATION_DURATION_MS)); // アニメーション時間分待つ
             return; 
         }
 
+        // データセットを更新 (DOM要素の物理的な位置はCSS transformで制御)
         tile1.dataset.row = r2;
         tile1.dataset.col = c2;
         tile2.dataset.row = r1;
         tile2.dataset.col = c1;
         
-        updateFullBoardDOM(); 
-        
-        await new Promise(resolve => setTimeout(resolve, ANIMATION_DURATION_MS)); 
+        // CSS transform を更新してアニメーションをトリガー
+        tile1.style.transform = `translate(${c2 * TILE_SIZE}px, ${r2 * TILE_SIZE}px)`;
+        tile2.style.transform = `translate(${c1 * TILE_SIZE}px, ${r1 * TILE_SIZE}px)`;
+
+        await new Promise(resolve => setTimeout(resolve, ANIMATION_DURATION_MS)); // アニメーション完了を待つ
     }
     
     async function checkMatchesWrapper() {
@@ -310,6 +354,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 tileDiv.classList.add('clearing'); 
 
                 animationPromises.push(new Promise(resolve => {
+                    // transitionend イベントリスナーでアニメーションの終了を待つ
                     tileDiv.addEventListener('transitionend', function handler() {
                         tileDiv.removeEventListener('transitionend', handler);
                         if (tileDiv.parentNode === gameBoard) { 
@@ -327,6 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function dropTiles() {
+        // 内部ボードのデータ移動
         for (let c = 0; c < BOARD_SIZE; c++) {
             let emptySpacesInColumn = 0;
             for (let r = BOARD_SIZE - 1; r >= 0; r--) {
@@ -340,6 +386,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
+            // 新しいタイルを上部に生成
             for (let i = 0; i < emptySpacesInColumn; i++) {
                 const newRow = i; 
                 const newAnimalType = Math.floor(Math.random() * TILE_TYPES);
@@ -347,8 +394,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         
+        // DOMを現在のボード状態に合わせて更新し、落下アニメーションをトリガー
         updateFullBoardDOM(); 
         
+        // アニメーション完了を待つ
         await new Promise(resolve => setTimeout(resolve, ANIMATION_DURATION_MS)); 
 
         console.log("Tiles dropped and refilled.");
@@ -361,12 +410,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 const tile = createTileElement(r, c, board[r][c]);
                 gameBoard.appendChild(tile);
                 tile.classList.add('falling');
+                // CSS変数 `--board-size-px` を使ってアニメーションを調整
+                tile.style.setProperty('--board-size-px', `${BOARD_SIZE * TILE_SIZE}px`); // CSSで使えるように設定
                 tile.style.animationDelay = `${c * 0.03 + r * 0.05}s`; 
                 fallPromises.push(new Promise(resolve => {
                     tile.addEventListener('animationend', function handler() {
                         tile.removeEventListener('animationend', handler);
                         tile.classList.remove('falling');
                         tile.style.animationDelay = ''; 
+                        // アニメーション後の最終位置を確保するために transform をリセットまたは設定
+                        tile.style.transform = `translate(${c * TILE_SIZE}px, ${r * TILE_SIZE}px)`;
+                        tile.style.opacity = '1';
                         resolve();
                     }, { once: true });
                 }));
@@ -450,6 +504,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return new Promise(resolve => {
                 tile.classList.add('drop-off');
                 tile.style.setProperty('--drop-delay', `${Math.random() * 0.15 + 0.05}s`); 
+                // CSS変数 `--board-size-px` を使ってアニメーションを調整
+                tile.style.setProperty('--board-size-px', `${BOARD_SIZE * TILE_SIZE}px`); // CSSで使えるように設定
                 tile.addEventListener('animationend', function handler() {
                     tile.removeEventListener('animationend', handler);
                     if (tile.parentNode === gameBoard) { 
@@ -472,13 +528,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 const tile = createTileElement(r, c, board[r][c]); 
                 gameBoard.appendChild(tile);
                 tile.classList.add('falling'); 
+                // CSS変数 `--board-size-px` を使ってアニメーションを調整
+                tile.style.setProperty('--board-size-px', `${BOARD_SIZE * TILE_SIZE}px`); // CSSで使えるように設定
                 tile.style.animationDelay = `${c * 0.03 + r * 0.05}s`; 
                 fallPromises.push(new Promise(resolve => {
                     tile.addEventListener('animationend', function handler() {
                         tile.removeEventListener('animationend', handler);
                         tile.classList.remove('falling'); 
-                        tile.style.transform = ''; 
-                        tile.style.opacity = '';
+                        // アニメーション後の最終位置を確保するために transform をリセットまたは設定
+                        tile.style.transform = `translate(${c * TILE_SIZE}px, ${r * TILE_SIZE}px)`;
+                        tile.style.opacity = '1';
                         tile.style.animationDelay = ''; 
                         resolve();
                     }, { once: true });
