@@ -3,27 +3,588 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ZooKeeper風パズル</title>
-    <link rel="stylesheet" href="style.css">
+    <title>ズーキーパー風パズルゲーム</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* style.css の内容をここに直接記述 */
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            font-family: 'Inter', sans-serif; /* フォントをInterに設定 */
+            color: #333;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            color: #4a4a4a;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        #game-container {
+            border: 4px solid #8B4513; /* 木目調の枠 */
+            background-color: #fff;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            border-radius: 15px; /* 角を丸く */
+            overflow: hidden; /* 角丸に合わせて内容をクリップ */
+            padding: 10px; /* 内側の余白 */
+            position: relative; /* 選択ハイライト用 */
+        }
+
+        canvas {
+            display: block;
+            background-color: #eee; /* タイルがない部分の背景色 */
+            border-radius: 10px; /* Canvas自体も角を丸く */
+        }
+
+        /* メッセージボックスのスタイル */
+        #message-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 10px;
+            z-index: 1000;
+            display: none; /* 初期状態では非表示 */
+            text-align: center;
+            font-size: 1.2em;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+        }
+
+        #message-box button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin-top: 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s ease;
+        }
+
+        #message-box button:hover {
+            background-color: #45a049;
+        }
+
+    </style>
 </head>
 <body>
-    <h1>ZooKeeper風パズル</h1>
-    
-    <div id="game-info">
-        <div id="timer-bar-container">
-            <div id="timer-bar"></div>
-        </div>
-    </div>
-
+    <h1>ズーキーパー風パズル</h1>
     <div id="game-container">
-        <div id="game-board"></div>
-        
-        <div id="game-over-overlay" class="hidden">
-            <div id="game-over-message">ゲームオーバー</div>
-            <button id="restart-button">もう一度プレイ</button>
-        </div>
+        <canvas id="gameCanvas"></canvas>
     </div>
 
-    <script src="script.js"></script>
+    <div id="message-box">
+        <p id="message-text"></p>
+        <button id="message-button">OK</button>
+    </div>
+
+    <script>
+        // script.js の内容をここに直接記述
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const messageBox = document.getElementById('message-box');
+        const messageText = document.getElementById('message-text');
+        const messageButton = document.getElementById('message-button');
+
+        const TILE_SIZE = 60; // 1タイルのサイズ (px)
+        const GRID_COLS = 8; // グリッドの列数
+        const GRID_ROWS = 8; // グリッドの行数
+        const ITEM_TYPES = 5; // アイテムの種類数 (0-4の数値で表現)
+        const SWAP_ANIMATION_DURATION = 200; // 入れ替えアニメーションの時間 (ms)
+        const MATCH_FADE_DURATION = 300; // マッチ消去アニメーションの時間 (ms)
+        const DROP_ANIMATION_DURATION = 400; // 落下アニメーションの時間 (ms)
+
+        let gameBoard = []; // ゲームボードの状態を保持する二次元配列
+        let selectedTile = null; // 選択されたタイル {row, col}
+        let isProcessing = false; // アニメーション中や処理中かどうかのフラグ
+
+        // 各アイテムの色を定義 (画像がない場合の代替)
+        const itemColors = [
+            '#FF6347', // Tomato (赤系)
+            '#FFD700', // Gold (黄系)
+            '#6A5ACD', // SlateBlue (青系)
+            '#3CB371', // MediumSeaGreen (緑系)
+            '#DA70D6'  // Orchid (紫系)
+        ];
+
+        // メッセージボックスを表示する関数 (alertの代替)
+        function showMessageBox(message) {
+            messageText.textContent = message;
+            messageBox.style.display = 'block';
+        }
+
+        // メッセージボックスを非表示にする関数
+        messageButton.addEventListener('click', () => {
+            messageBox.style.display = 'none';
+        });
+
+        /**
+         * ゲームボードを初期化し、初期状態でマッチがないことを保証します。
+         */
+        function initBoard() {
+            gameBoard = Array(GRID_ROWS).fill(null).map(() => Array(GRID_COLS).fill(null));
+            for (let r = 0; r < GRID_ROWS; r++) {
+                for (let c = 0; c < GRID_COLS; c++) {
+                    // ランダムなアイテムを配置
+                    let newItem;
+                    do {
+                        newItem = Math.floor(Math.random() * ITEM_TYPES);
+                    } while (
+                        // 水平方向で既に2つ同じアイテムが並んでいるかチェック
+                        (c >= 2 && gameBoard[r][c - 1] === newItem && gameBoard[r][c - 2] === newItem) ||
+                        // 垂直方向で既に2つ同じアイテムが並んでいるかチェック
+                        (r >= 2 && gameBoard[r - 1][c] === newItem && gameBoard[r - 2][c] === newItem)
+                    );
+                    gameBoard[r][c] = newItem;
+                }
+            }
+            drawBoard(); // 初期ボードを描画
+        }
+
+        /**
+         * ゲームボードを描画します。
+         * @param {number} [alpha=1] - 描画するアイテムの透明度 (0から1)
+         */
+        function drawBoard(alpha = 1) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // キャンバスをクリア
+
+            for (let r = 0; r < GRID_ROWS; r++) {
+                for (let c = 0; c < GRID_COLS; c++) {
+                    const itemType = gameBoard[r][c];
+                    if (itemType !== null) {
+                        ctx.globalAlpha = alpha; // 透明度を設定
+                        ctx.fillStyle = itemColors[itemType]; // アイテムの色を設定
+                        ctx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE); // 四角形を描画
+                        ctx.globalAlpha = 1; // 透明度をリセット
+
+                        // タイルの境界線
+                        ctx.strokeStyle = '#333';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                    }
+
+                    // 選択中のタイルをハイライト
+                    if (selectedTile && selectedTile.row === r && selectedTile.col === c) {
+                        ctx.strokeStyle = '#FFD700'; // 選択色 (ゴールド)
+                        ctx.lineWidth = 4;
+                        ctx.strokeRect(c * TILE_SIZE + 2, r * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+                    }
+                }
+            }
+        }
+
+        let touchStartX, touchStartY; // タッチ開始座標
+        let touchStartTime; // タッチ開始時刻
+
+        /**
+         * タッチ開始時のイベントハンドラ
+         * @param {TouchEvent} e - タッチイベントオブジェクト
+         */
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // デフォルトのスクロールなどを防止
+            if (isProcessing) return; // 処理中は入力を受け付けない
+
+            const touch = e.touches[0];
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+            touchStartTime = Date.now();
+
+            // タッチされた位置からタイルを特定
+            const rect = canvas.getBoundingClientRect();
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            const col = Math.floor(x / TILE_SIZE);
+            const row = Math.floor(y / TILE_SIZE);
+
+            if (row >= 0 && row < GRID_ROWS && col >= 0 && col < GRID_COLS) {
+                selectedTile = { row, col };
+                drawBoard(); // 選択状態を反映するために再描画
+            }
+        }, { passive: false }); // passive: false を設定して preventDefault() を有効にする
+
+        /**
+         * タッチ終了時のイベントハンドラ
+         * @param {TouchEvent} e - タッチイベントオブジェクト
+         */
+        canvas.addEventListener('touchend', async (e) => {
+            if (!selectedTile || isProcessing) return;
+
+            const touch = e.changedTouches[0];
+            const touchEndX = touch.clientX;
+            const touchEndY = touch.clientY;
+            const touchEndTime = Date.now();
+
+            const dx = touchEndX - touchStartX;
+            const dy = touchEndY - touchStartY;
+            const touchDuration = touchEndTime - touchStartTime;
+
+            const swipeThreshold = 30; // フリックと判定する最小移動距離 (px)
+            const maxTapDuration = 200; // タップと判定する最大時間 (ms)
+
+            let targetTile = null;
+
+            // フリック方向の判定
+            if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > swipeThreshold) { // 水平方向のフリック
+                if (dx > 0) { // 右フリック
+                    targetTile = { row: selectedTile.row, col: selectedTile.col + 1 };
+                } else { // 左フリック
+                    targetTile = { row: selectedTile.row, col: selectedTile.col - 1 };
+                }
+            } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > swipeThreshold) { // 垂直方向のフリック
+                if (dy > 0) { // 下フリック
+                    targetTile = { row: selectedTile.row + 1, col: selectedTile.col };
+                } else { // 上フリック
+                    targetTile = { row: selectedTile.row - 1, col: selectedTile.col };
+                }
+            } else if (Math.abs(dx) <= swipeThreshold && Math.abs(dy) <= swipeThreshold && touchDuration < maxTapDuration) {
+                // 移動距離が小さく、時間が短い場合はタップとみなす (ここでは特に処理なし、選択解除のみ)
+                selectedTile = null;
+                drawBoard();
+                return;
+            }
+
+            if (targetTile && isValidSwap(selectedTile, targetTile)) {
+                isProcessing = true; // 処理中フラグを立てる
+
+                // アニメーションを伴ってアイテムを入れ替える
+                await animateSwap(selectedTile, targetTile);
+
+                // 入れ替え後のマッチ判定
+                const matches = findMatches();
+                if (matches.length > 0) {
+                    await processGameCycle(); // マッチ処理、落下、補充、連鎖
+                } else {
+                    // マッチしなかったら元に戻すアニメーション
+                    await animateSwap(targetTile, selectedTile); // 元に戻す
+                    showMessageBox("マッチしませんでした。");
+                }
+            } else {
+                selectedTile = null; // 無効なスワイプなら選択解除
+            }
+            selectedTile = null; // 選択を解除
+            drawBoard(); // 最終的なボード状態を描画
+            isProcessing = false; // 処理中フラグを解除
+        });
+
+        /**
+         * ゲームのサイクル (マッチ処理、落下、補充、連鎖) を実行します。
+         */
+        async function processGameCycle() {
+            let matchesFound = true;
+            while (matchesFound) {
+                const matches = findMatches();
+                if (matches.length > 0) {
+                    await animateMatchRemoval(matches); // マッチしたアイテムを消去アニメーション
+                    dropTiles(); // アイテムを落下
+                    await animateDrop(); // 落下アニメーション
+                    fillEmptyTiles(); // 空のマスに新しいアイテムを補充
+                    await animateFill(); // 補充アニメーション
+                } else {
+                    matchesFound = false; // マッチがなければループ終了
+                }
+            }
+        }
+
+        /**
+         * 2つのタイルが入れ替え可能か判定します。
+         * @param {Object} tile1 - 1つ目のタイル {row, col}
+         * @param {Object} tile2 - 2つ目のタイル {row, col}
+         * @returns {boolean} - 入れ替え可能ならtrue
+         */
+        function isValidSwap(tile1, tile2) {
+            // 盤面外かどうかのチェック
+            if (tile2.row < 0 || tile2.row >= GRID_ROWS || tile2.col < 0 || tile2.col >= GRID_COLS) {
+                return false;
+            }
+            // 隣接しているかどうかのチェック (縦か横に1マスだけ離れている)
+            const dr = Math.abs(tile1.row - tile2.row);
+            const dc = Math.abs(tile1.col - tile2.col);
+            return (dr === 1 && dc === 0) || (dr === 0 && dc === 1);
+        }
+
+        /**
+         * アイテムの入れ替えアニメーションを実行し、ボードの状態を更新します。
+         * @param {Object} tile1 - 入れ替える1つ目のタイル {row, col}
+         * @param {Object} tile2 - 入れ替える2つ目のタイル {row, col}
+         * @returns {Promise<void>} - アニメーション完了時に解決するPromise
+         */
+        async function animateSwap(tile1, tile2) {
+            const item1 = gameBoard[tile1.row][tile1.col];
+            const item2 = gameBoard[tile2.row][tile2.col];
+
+            // 仮想的な位置情報を持つオブジェクト
+            const animatedTiles = [
+                { type: item1, x: tile1.col * TILE_SIZE, y: tile1.row * TILE_SIZE, targetX: tile2.col * TILE_SIZE, targetY: tile2.row * TILE_SIZE },
+                { type: item2, x: tile2.col * TILE_SIZE, y: tile2.row * TILE_SIZE, targetX: tile1.col * TILE_SIZE, targetY: tile1.row * TILE_SIZE }
+            ];
+
+            const startTime = performance.now();
+
+            return new Promise(resolve => {
+                function animate() {
+                    const elapsed = performance.now() - startTime;
+                    const progress = Math.min(elapsed / SWAP_ANIMATION_DURATION, 1); // 0から1に正規化
+
+                    drawBoard(); // 背景のボードをまず描画 (選択ハイライトなし)
+
+                    animatedTiles.forEach(tile => {
+                        const currentX = tile.x + (tile.targetX - tile.x) * progress;
+                        const currentY = tile.y + (tile.targetY - tile.y) * progress;
+
+                        ctx.fillStyle = itemColors[tile.type];
+                        ctx.fillRect(currentX, currentY, TILE_SIZE, TILE_SIZE);
+                        ctx.strokeStyle = '#333';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(currentX, currentY, TILE_SIZE, TILE_SIZE);
+                    });
+
+                    if (progress < 1) {
+                        requestAnimationFrame(animate);
+                    } else {
+                        // アニメーション終了後、実際のボードの状態を更新
+                        gameBoard[tile1.row][tile1.col] = item2;
+                        gameBoard[tile2.row][tile2.col] = item1;
+                        drawBoard(); // 最終的な状態を描画
+                        resolve();
+                    }
+                }
+                requestAnimationFrame(animate);
+            });
+        }
+
+        /**
+         * マッチしているアイテムを検出し、その座標の配列を返します。
+         * @returns {Array<Object>} - マッチしたタイルの {row, col} オブジェクトの配列
+         */
+        function findMatches() {
+            const matches = new Set(); // 重複を避けるためにSetを使用
+
+            // 水平方向のマッチを検出
+            for (let r = 0; r < GRID_ROWS; r++) {
+                for (let c = 0; c < GRID_COLS - 2; c++) {
+                    const item = gameBoard[r][c];
+                    if (item !== null && item === gameBoard[r][c + 1] && item === gameBoard[r][c + 2]) {
+                        // 3つ以上並んでいる場合
+                        let i = c;
+                        while (i < GRID_COLS && gameBoard[r][i] === item) {
+                            matches.add(JSON.stringify({ row: r, col: i }));
+                            i++;
+                        }
+                    }
+                }
+            }
+
+            // 垂直方向のマッチを検出
+            for (let c = 0; c < GRID_COLS; c++) {
+                for (let r = 0; r < GRID_ROWS - 2; r++) {
+                    const item = gameBoard[r][c];
+                    if (item !== null && item === gameBoard[r + 1][c] && item === gameBoard[r + 2][c]) {
+                        let i = r;
+                        while (i < GRID_ROWS && gameBoard[i][c] === item) {
+                            matches.add(JSON.stringify({ row: i, col: c }));
+                            i++;
+                        }
+                    }
+                }
+            }
+            return Array.from(matches).map(s => JSON.parse(s));
+        }
+
+        /**
+         * マッチしたアイテムを消去するアニメーションを実行します。
+         * @param {Array<Object>} matches - 消去するタイルの {row, col} オブジェクトの配列
+         * @returns {Promise<void>} - アニメーション完了時に解決するPromise
+         */
+        async function animateMatchRemoval(matches) {
+            const startTime = performance.now();
+            const tilesToRemove = matches.map(match => ({
+                row: match.row,
+                col: match.col,
+                originalType: gameBoard[match.row][match.col] // アニメーション用に元のタイプを保持
+            }));
+
+            return new Promise(resolve => {
+                function animate() {
+                    const elapsed = performance.now() - startTime;
+                    const progress = Math.min(elapsed / MATCH_FADE_DURATION, 1); // 0から1に正規化
+                    const alpha = 1 - progress; // フェードアウト
+
+                    drawBoard(1); // 全てのタイルを通常描画
+
+                    // 消去対象のタイルだけ透明度を下げて描画
+                    tilesToRemove.forEach(tile => {
+                        ctx.globalAlpha = alpha;
+                        ctx.fillStyle = itemColors[tile.originalType];
+                        ctx.fillRect(tile.col * TILE_SIZE, tile.row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        ctx.strokeStyle = '#333';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(tile.col * TILE_SIZE, tile.row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        ctx.globalAlpha = 1;
+                    });
+
+                    if (progress < 1) {
+                        requestAnimationFrame(animate);
+                    } else {
+                        // アニメーション終了後、ボードからアイテムを削除
+                        matches.forEach(match => {
+                            gameBoard[match.row][match.col] = null;
+                        });
+                        drawBoard(); // 最終的な状態を描画
+                        resolve();
+                    }
+                }
+                requestAnimationFrame(animate);
+            });
+        }
+
+        /**
+         * アイテムを落下させ、ボードの状態を更新します。
+         */
+        function dropTiles() {
+            for (let c = 0; c < GRID_COLS; c++) {
+                let emptySpaces = 0; // その列の空きマスの数
+                for (let r = GRID_ROWS - 1; r >= 0; r--) {
+                    if (gameBoard[r][c] === null) {
+                        emptySpaces++;
+                    } else if (emptySpaces > 0) {
+                        // アイテムを空きマスの数だけ下に移動
+                        gameBoard[r + emptySpaces][c] = gameBoard[r][c];
+                        gameBoard[r][c] = null;
+                    }
+                }
+            }
+        }
+
+        /**
+         * アイテム落下のアニメーションを実行します。
+         * (実際にはdropTiles()で状態が更新された後に、その変化をアニメーションで表現)
+         * @returns {Promise<void>} - アニメーション完了時に解決するPromise
+         */
+        async function animateDrop() {
+            // この関数は、dropTiles()によって更新されたボードの状態を元に、
+            // 実際にタイルが落ちるように見せるアニメーションを実装します。
+            // 簡略化のため、ここでは単純にsetTimeoutで待つだけにします。
+            // より高度な実装では、各タイルの開始Y座標と終了Y座標を計算し、
+            // requestAnimationFrameで補間して描画します。
+            drawBoard(); // 落下後の状態を即時描画 (アニメーションなし)
+            return new Promise(resolve => setTimeout(resolve, DROP_ANIMATION_DURATION));
+        }
+
+        /**
+         * 空のマスに新しいアイテムを補充し、ボードの状態を更新します。
+         */
+        function fillEmptyTiles() {
+            for (let r = 0; r < GRID_ROWS; r++) {
+                for (let c = 0; c < GRID_COLS; c++) {
+                    if (gameBoard[r][c] === null) {
+                        gameBoard[r][c] = Math.floor(Math.random() * ITEM_TYPES);
+                    }
+                }
+            }
+        }
+
+        /**
+         * 新しいアイテム補充のアニメーションを実行します。
+         * (実際にはfillEmptyTiles()で状態が更新された後に、その変化をアニメーションで表現)
+         * @returns {Promise<void>} - アニメーション完了時に解決するPromise
+         */
+        async function animateFill() {
+            // この関数は、fillEmptyTiles()によって更新されたボードの状態を元に、
+            // 新しいタイルが上から降ってくるように見せるアニメーションを実装します。
+            // 簡略化のため、ここでは単純にsetTimeoutで待つだけにします。
+            drawBoard(); // 補充後の状態を即時描画 (アニメーションなし)
+            return new Promise(resolve => setTimeout(resolve, 200)); // 少し待つ
+        }
+
+        // --- ゲームの初期設定と開始 ---
+        // Canvasのサイズを設定
+        canvas.width = GRID_COLS * TILE_SIZE;
+        canvas.height = GRID_ROWS * TILE_SIZE;
+
+        // ゲーム開始
+        initBoard();
+
+        // ウィンドウのリサイズイベントに対応 (Canvasサイズを再設定し、再描画)
+        window.addEventListener('resize', () => {
+            canvas.width = GRID_COLS * TILE_SIZE;
+            canvas.height = GRID_ROWS * TILE_SIZE;
+            drawBoard();
+        });
+
+        // マウスイベントも追加 (デバッグ用やPCでの操作用)
+        let mouseStartX, mouseStartY;
+        canvas.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            if (isProcessing) return;
+
+            mouseStartX = e.clientX;
+            mouseStartY = e.clientY;
+
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const col = Math.floor(x / TILE_SIZE);
+            const row = Math.floor(y / TILE_SIZE);
+
+            if (row >= 0 && row < GRID_ROWS && col >= 0 && col < GRID_COLS) {
+                selectedTile = { row, col };
+                drawBoard();
+            }
+        });
+
+        canvas.addEventListener('mouseup', async (e) => {
+            if (!selectedTile || isProcessing) return;
+
+            const dx = e.clientX - mouseStartX;
+            const dy = e.clientY - mouseStartY;
+
+            const swipeThreshold = 30; // フリックと判定する最小移動距離 (px)
+
+            let targetTile = null;
+
+            if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > swipeThreshold) {
+                if (dx > 0) {
+                    targetTile = { row: selectedTile.row, col: selectedTile.col + 1 };
+                } else {
+                    targetTile = { row: selectedTile.row, col: selectedTile.col - 1 };
+                }
+            } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > swipeThreshold) {
+                if (dy > 0) {
+                    targetTile = { row: selectedTile.row + 1, col: selectedTile.col };
+                } else {
+                    targetTile = { row: selectedTile.row - 1, col: selectedTile.col };
+                }
+            }
+
+            if (targetTile && isValidSwap(selectedTile, targetTile)) {
+                isProcessing = true;
+                await animateSwap(selectedTile, targetTile);
+
+                const matches = findMatches();
+                if (matches.length > 0) {
+                    await processGameCycle();
+                } else {
+                    await animateSwap(targetTile, selectedTile);
+                    showMessageBox("マッチしませんでした。");
+                }
+            } else {
+                selectedTile = null;
+            }
+            selectedTile = null;
+            drawBoard();
+            isProcessing = false;
+        });
+
+    </script>
 </body>
 </html>
