@@ -1,0 +1,218 @@
+body {
+    font-family: 'Arial', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #f0f0f0;
+    margin: 0;
+}
+
+.container {
+    background-color: #ffffff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+    text-align: center;
+}
+
+h1 {
+    color: #333;
+    margin-bottom: 20px;
+}
+
+.game-info {
+    margin-bottom: 20px;
+    font-size: 1.1em;
+    color: #555;
+}
+
+#current-player-display {
+    font-weight: bold;
+}
+
+.board {
+    display: grid;
+    grid-template-columns: repeat(8, 50px); /* 8列 */
+    grid-template-rows: repeat(8, 50px);    /* 8行 */
+    width: 400px; /* 50px * 8 = 400px */
+    height: 400px;
+    border: 2px solid #333;
+    background-color: #008000; /* オセロ盤の緑色 */
+    margin: 0 auto 20px;
+    box-sizing: content-box; /* paddingやborderがwidth/heightに含まれないように */
+    perspective: 1000px; /* 3D変形のためのパースペクティブ */
+}
+
+.cell {
+    width: 50px;
+    height: 50px;
+    border: 1px solid #006400; /* マス目の境界線 */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-sizing: border-box; /* borderがwidth/heightに含まれるように */
+}
+
+.stone {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    /* アニメーションのトランジションを追加 */
+    transition: background-color 0.5s ease-in-out, transform 0.5s ease-in-out; /* アニメーション時間を少し長く */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold; /* 石の中の文字（デバッグ用） */
+    /* 3D変形を有効にするために重要 */
+    transform-style: preserve-3d;
+    backface-visibility: hidden; /* 裏返った時に見えなくする */
+    /* 石の基盤となる影と位置調整 */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); /* 石自体の影 */
+    position: relative; /* 擬似要素の位置決めのため */
+}
+
+.stone.white {
+    /* 白石のグラデーションと影 */
+    background: radial-gradient(circle at 15px 15px, #ffffff, #e0e0e0, #c0c0c0); /* 光沢感のあるグラデーション */
+    border: 1px solid #c0c0c0;
+    color: #333;
+    /* 立体感を強調する影 */
+    box-shadow: 0 0 5px rgba(255, 255, 255, 0.5), /* 内側の光沢 */
+                0 5px 10px rgba(0, 0, 0, 0.4);   /* 外部の影 */
+}
+
+.stone.black {
+    /* 黒石のグラデーションと影 */
+    background: radial-gradient(circle at 15px 15px, #333333, #000000, #000000); /* 光沢感のあるグラデーション */
+    border: 1px solid #222;
+    color: #fff;
+    /* 立体感を強調する影 */
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.5), /* 内側の光沢 */
+                0 5px 10px rgba(0, 0, 0, 0.6);   /* 外部の影 */
+}
+
+/* --- 石の厚み表現のための追加CSS --- */
+.stone::before,
+.stone::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    /* transform-origin: center center; */ /* デフォルトで中心なので不要な場合も */
+    backface-visibility: hidden;
+    transition: background-color 0.5s ease-in-out, transform 0.5s ease-in-out;
+}
+
+/* 石の側面（白） */
+.stone.white::before {
+    background-color: #bbbbbb; /* 側面の少し暗い白 */
+    transform: rotateY(90deg) translateZ(-2px); /* Y軸90度回転＋Z軸で少し奥へ移動 */
+}
+/* 石の側面（黒） */
+.stone.black::before {
+    background-color: #222222; /* 側面の少し明るい黒 */
+    transform: rotateY(90deg) translateZ(-2px);
+}
+
+/* 石の裏側（白） */
+.stone.white::after {
+    background: radial-gradient(circle at 15px 15px, #ffffff, #e0e0e0, #c0c0c0); /* 白石の裏側も同じグラデーション */
+    transform: rotateY(180deg) translateZ(0); /* 180度回転して裏側 */
+}
+/* 石の裏側（黒） */
+.stone.black::after {
+    background: radial-gradient(circle at 15px 15px, #333333, #000000, #000000); /* 黒石の裏側も同じグラデーション */
+    transform: rotateY(180deg) translateZ(0);
+}
+
+
+/* アニメーションのキーフレーム調整 */
+@keyframes flip-to-white {
+    0% { transform: rotateY(0deg); }
+    50% { transform: rotateY(90deg); }
+    100% { transform: rotateY(180deg); }
+}
+
+@keyframes flip-to-black {
+    0% { transform: rotateY(0deg); }
+    50% { transform: rotateY(90deg); }
+    100% { transform: rotateY(180deg); }
+}
+
+/* アニメーション適用時のクラス */
+.animate-flip-white {
+    animation: flip-to-white 0.5s forwards;
+}
+
+.animate-flip-black {
+    animation: flip-to-black 0.5s forwards;
+}
+
+/* アニメーション中に擬似要素の色も切り替えるための追加スタイル */
+.animate-flip-white::before {
+    animation: flip-before-to-white 0.5s forwards;
+}
+.animate-flip-white::after {
+    animation: flip-after-to-white 0.5s forwards;
+}
+.animate-flip-black::before {
+    animation: flip-before-to-black 0.5s forwards;
+}
+.animate-flip-black::after {
+    animation: flip-after-to-black 0.5s forwards;
+}
+
+
+/* 擬似要素のアニメーションキーフレーム */
+@keyframes flip-before-to-white {
+    0% { background-color: #222222; } /* 黒の側面から */
+    50% { background-color: #bbbbbb; } /* 白の側面へ */
+    100% { background-color: #bbbbbb; }
+}
+@keyframes flip-before-to-black {
+    0% { background-color: #bbbbbb; } /* 白の側面から */
+    50% { background-color: #222222; } /* 黒の側面へ */
+    100% { background-color: #222222; }
+}
+
+@keyframes flip-after-to-white {
+    0% { background: radial-gradient(circle at 15px 15px, #333333, #000000, #000000); } /* 黒のグラデーションから */
+    50% { transform: rotateY(90deg) translateZ(0); } /* 90度回ってから */
+    100% { background: radial-gradient(circle at 15px 15px, #ffffff, #e0e0e0, #c0c0c0); } /* 白のグラデーションへ */
+}
+@keyframes flip-after-to-black {
+    0% { background: radial-gradient(circle at 15px 15px, #ffffff, #e0e0e0, #c0c0c0); } /* 白のグラデーションから */
+    50% { transform: rotateY(90deg) translateZ(0); }
+    100% { background: radial-gradient(circle at 15px 15px, #333333, #000000, #000000); } /* 黒のグラデーションへ */
+}
+
+
+.highlight {
+    background-color: rgba(255, 255, 0, 0.3); /* 置ける場所のハイライト */
+    cursor: pointer;
+}
+
+.message {
+    font-size: 1.2em;
+    color: #d32f2f;
+    margin-bottom: 15px;
+    font-weight: bold;
+    min-height: 1.2em; /* ガタつき対策で追加したmin-heightは残しています */
+}
+
+#reset-button {
+    padding: 10px 20px;
+    font-size: 1em;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+#reset-button:hover {
+    background-color: #45a049;
+}
