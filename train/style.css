@@ -1,0 +1,146 @@
+/* style.css */
+
+body {
+    margin: 0;
+    overflow: hidden; /* スクロールバーが表示されないようにする */
+    font-family: 'Arial', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh; /* ビューポートの高さに合わせる */
+    background-color: #333; /* 背景色 */
+    color: #eee; /* デフォルトの文字色 */
+}
+
+#game-container {
+    position: relative;
+    width: 960px; /* CANVAS_WIDTH に合わせる */
+    height: 540px; /* CANVAS_HEIGHT に合わせる */
+    background-color: #000; /* ゲームの背景 */
+    overflow: hidden; /* コンテナからはみ出る要素を隠す */
+    border: 5px solid #555; /* 枠線 */
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5); /* 影 */
+}
+
+canvas {
+    display: block; /* 余白をなくす */
+    position: absolute; /* 他のUIと重ねるため */
+    top: 0;
+    left: 0;
+    z-index: 10; /* 最も奥 */
+}
+
+/* 各画面の基本スタイル */
+.game-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none; /* デフォルトでは非表示 */
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    background-color: rgba(0, 0, 0, 0.8); /* 半透明の黒いオーバーレイ */
+    color: white;
+    font-size: 2em;
+    text-align: center;
+    transition: opacity 0.3s ease-in-out; /* フェードイン・アウト用 */
+    opacity: 0; /* 最初は透明 */
+    pointer-events: none; /* クリックイベントを透過させる */
+    z-index: 100; /* キャンバスより手前 */
+}
+
+.game-screen.active {
+    display: flex; /* active クラスが付いたら表示 */
+    opacity: 1; /* 不透明にする */
+    pointer-events: auto; /* クリックイベントを有効にする */
+    z-index: 110; /* アクティブな画面はさらに手前に */
+}
+
+/* 全ボタン共通のスタイルをここに定義 */
+button {
+    padding: 15px 30px; /* 少し大きめに */
+    font-size: 1em; /* 大きめに */
+    cursor: pointer;
+    background-color: #007bff; /* 青色 */
+    color: white;
+    border: none;
+    border-radius: 8px; /* 角丸を少し大きく */
+    transition: background-color 0.2s, transform 0.1s;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); /* 影を追加 */
+    margin-top: 40px; /* 上部との間隔を調整 */
+}
+
+button:hover {
+    background-color: #0056b3; /* ホバー時の色 */
+    transform: translateY(-2px); /* 少し上に浮き上がる */
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.4); /* ホバー時の影 */
+}
+
+button:active {
+    background-color: #003d80; /* クリック時の色 */
+    transform: translateY(0); /* 押し込む感じ */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+
+/* タイトル画面 */
+#title-screen {
+    font-size: 2.5em;
+}
+
+#title-screen p {
+    font-size: 0.6em;
+    margin-top: 20px;
+    color: #ccc;
+}
+
+#last-result {
+    font-size: 0.5em;
+    margin-top: 30px;
+    color: #bbb;
+}
+
+/* ゲームプレイ中のUI */
+#game-play-ui {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: transparent; /* 背景は透過 */
+    pointer-events: none; /* UI要素自体のクリックイベントを透過させ、キャンバス下のイベントを受け取れるようにする */
+    display: none; /* デフォルトで非表示にする */
+    z-index: 90; /* タイトル/リザルト画面より奥、キャンバスより手前 */
+}
+
+#game-play-ui.active {
+    display: block; /* active クラスが付いたら表示 */
+}
+
+/* 距離表示 */
+#distance-display {
+    position: absolute; /* 絶対配置 */
+    top: 20px; /* 画面上部から20pxの位置 */
+    left: 50%; /* 水平方向の中央 */
+    transform: translateX(-50%); /* 要素自身の幅の半分だけ左にずらし、水平方向の完全な中央に */
+    font-size: 2.5em; /* 文字サイズを調整（大きすぎず小さすぎず） */
+    color: #FFFFFF; /* 文字色を白に */
+    text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.8); /* 読みやすくするための強い影 */
+    z-index: 100; /* #game-play-ui の子要素として、ゲームUIの中で最前面 */
+    white-space: nowrap; /* テキストが改行されないように */
+    pointer-events: none; /* クリックイベントを透過させる */
+}
+
+
+/* リザルト画面 */
+#result-screen h2 {
+    font-size: 1.5em;
+    margin-bottom: 20px;
+}
+
+#result-screen p {
+    font-size: 0.8em;
+    margin-bottom: 10px;
+}

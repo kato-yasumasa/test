@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>電車停車ゲーム</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        
+        <div id="title-screen" class="game-screen">
+            <h1>電車停車ゲーム</h1>
+            <button id="push-start">PUSH START</button>
+            <p id="last-result"></p>
+        </div>
+
+        <div id="game-play-ui" class="game-screen">
+            <span id="distance-display">距離: --.--m</span>
+        </div>
+
+        <div id="result-screen" class="game-screen">
+            <h2>結果発表！</h2>
+            <p>停止距離: <span id="final-distance"></span>m</p>
+            <p>スコア: <span id="final-score"></span>点</p>
+            <button id="back-to-title">TO TITLE</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
