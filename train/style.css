@@ -105,8 +105,8 @@ button:active {
 
 /* タイトル画面 */
 #title-screen {
-    /* 現在: 3rem (48px相当) -> 例: 3.5rem (56px相当) に変更 */
-    font-size: 3.5rem; /* ★ここを調整 */
+    /* 3rem (48px相当) */
+    font-size: 3rem; /* ★ここを調整 */
 }
 
 #title-screen p {
@@ -157,8 +157,8 @@ button:active {
 
 /* リザルト画面 */
 #result-screen h2 {
-    /* 現在: 1.875rem (30px相当) -> 例: 2.2rem (約35.2px相当) に変更 */
-    font-size: 2.2rem; /* ★ここを調整 */
+    /* 現在: 1.875rem (30px相当) -> 例: 2.5rem (約40px相当) に変更 */
+    font-size: 2.5rem; /* ★ここを調整 */
     margin-bottom: 1.25rem;
 }
 
@@ -166,4 +166,15 @@ button:active {
     /* 現在: 1.25rem (20px相当) -> 例: 2.5rem (40px相当) に変更 */
     font-size: 2.5rem; /* ★ここを調整 */
     margin-bottom: 0.625rem;
+}
+
+/* 点滅アニメーションの定義 */
+@keyframes blink {
+    0%, 100% { opacity: 1; } /* 最初と最後は完全に表示 */
+    50% { opacity: 0; }    /* 中間で完全に透明 */
+}
+
+/* PUSH START と タイトルへ のテキストに点滅アニメーションを適用 */
+#push-start, #back-to-title {
+    animation: blink 1.5s infinite alternate ease-in-out; /* 1.5秒かけて点滅を無限に繰り返し */
 }
