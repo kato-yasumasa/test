@@ -2,8 +2,8 @@
 
 /* ルート要素でゲーム全体のスケールファクターを定義 */
 :root {
-    --base-game-width: 960;
-    --base-game-height: 540;
+    --base-game-width: 1920; /* 変更: 960 -> 1920 */
+    --base-game-height: 1080; /* 変更: 540 -> 1080 */
     /* 現在のビューポートに対してゲームがどれだけ収まるかを計算 */
     --current-game-scale: min(100vw / var(--base-game-width), 100vh / var(--base-game-height));
 }
@@ -60,7 +60,7 @@ canvas {
     justify-content: center;
     align-items: center;
     flex-direction: column;
-    background-color: rgba(0, 0, 0, 0.8);
+    background-color: rgba(0, 0, 0, 0.8); /* ここは変更せず、元のフィルターを維持 */
     color: white;
     text-align: center;
     transition: opacity 0.3s ease-in-out;
@@ -105,20 +105,22 @@ button:active {
 
 /* タイトル画面 */
 #title-screen {
-    /* 3rem (48px相当) */
-    font-size: 3rem; /* ★ここを調整 */
+    background-image: url('images/title_background.png'); 
+    background-size: cover;      
+    background-position: center; 
+    background-repeat: no-repeat;
+    background-color: transparent; /* この行は維持: タイトル画面のフィルターを透明に */
+    font-size: 3rem; 
 }
 
 #title-screen p {
-    /* 現在: 1.25rem (20px相当) -> 例: 2.5rem (40px相当) に変更 */
-    font-size: 2.5rem; /* ★ここを調整 */
+    font-size: 2.5rem; 
     margin-top: 1.25rem;
     color: #ccc;
 }
 
 #last-result {
-    /* 現在: 1.125rem (18px相当) -> 例: 1.3rem (約20.8px相当) に変更 */
-    font-size: 1.3rem; /* ★ここを調整 */
+    font-size: 1.3rem; 
     margin-top: 1.875rem;
     color: #bbb;
 }
@@ -156,25 +158,26 @@ button:active {
 
 
 /* リザルト画面 */
+#result-screen { /* 追加: リザルト画面に明示的に背景色を再設定 */
+    background-color: rgba(0, 0, 0, 0.8); /* リザルト画面にフィルターを再適用 */
+}
 #result-screen h2 {
-    /* 現在: 1.875rem (30px相当) -> 例: 2.5rem (約40px相当) に変更 */
-    font-size: 2.5rem; /* ★ここを調整 */
+    font-size: 2.5rem; 
     margin-bottom: 1.25rem;
 }
 
 #result-screen p {
-    /* 現在: 1.25rem (20px相当) -> 例: 2.5rem (40px相当) に変更 */
-    font-size: 2.5rem; /* ★ここを調整 */
+    font-size: 2.5rem; 
     margin-bottom: 0.625rem;
 }
 
 /* 点滅アニメーションの定義 */
 @keyframes blink {
-    0%, 100% { opacity: 1; } /* 最初と最後は完全に表示 */
-    50% { opacity: 0; }    /* 中間で完全に透明 */
+    0%, 100% { opacity: 1; } 
+    50% { opacity: 0; }    
 }
 
 /* PUSH START と タイトルへ のテキストに点滅アニメーションを適用 */
 #push-start, #back-to-title {
-    animation: blink 1.5s infinite alternate ease-in-out; /* 1.5秒かけて点滅を無限に繰り返し */
+    animation: blink 1.5s infinite alternate ease-in-out; 
 }
