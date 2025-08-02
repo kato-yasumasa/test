@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
         turn = 'player';
         playerScoreElement.textContent = playerScore;
         cpuScoreElement.textContent = cpuScore;
-        turnElement.textContent = 'プレイヤー';
+        turnElement.textContent = 'あなた';
         resultModal.style.display = 'none';
         availableCards = [...Array(cards.length).keys()];
 
@@ -143,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pairsFound === cards.length / 2) return;
 
         turn = (turn === 'player') ? 'cpu' : 'player';
-        turnElement.textContent = (turn === 'player') ? 'プレイヤー' : 'CPU';
+        turnElement.textContent = (turn === 'player') ? 'あなた' : 'ＣＰＵ';
 
         if (turn === 'cpu') {
             setTimeout(cpuTurn, 1000);
@@ -189,7 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (playerScore > cpuScore) {
             result = 'あなたの勝ちです！🎉';
         } else if (playerScore < cpuScore) {
-            result = 'CPUの勝ちです！🤖';
+            result = 'ＣＰＵの勝ちです！🤖';
         } else {
             result = '引き分けです！🤝';
         }
