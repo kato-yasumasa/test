@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>神経衰弱ゲーム (CPU対戦)</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <h1>神経衰弱ゲーム (CPU対戦)</h1>
+    <div class="status-container">
+        <p>現在のターン: <span id="current-turn">プレイヤー</span></p>
+        <p>プレイヤーのスコア: <span id="player-score">0</span></p>
+        <p>CPUのスコア: <span id="cpu-score">0</span></p>
+    </div>
+    <div class="game-container">
+        </div>
+
+    <div id="result-modal" class="modal">
+        <div class="modal-content">
+            <h2 id="result-text"></h2>
+            <p id="final-scores"></p>
+            <button id="restart-button">もう一度遊ぶ</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
