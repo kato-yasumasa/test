@@ -5,9 +5,9 @@ const scoreDisplay = document.getElementById('score');
 
 // ゲーム設定
 const gravity = 0.5;
-const gameWidth = 360; // HTMLと一致
-const gameHeight = 720; // HTMLと一致
-const topBoundary = 100; // フルーツを落とす位置のライン
+const gameWidth = 360; 
+const gameHeight = 720;
+const topBoundary = 100;
 
 const baseRestitution = 0.2; 
 const basePushFactor = 0.8; 
@@ -189,48 +189,59 @@ function resetGame() {
     gameLoop();
 }
 
-// フルーツを落とすイベント (マウスとタッチの両方に対応)
-canvas.addEventListener('mousedown', dropFruit);
-canvas.addEventListener('touchstart', dropFruit);
+// 既存のマウスイベントを削除し、タッチイベントに統一
+canvas.removeEventListener('mousedown', dropFruit);
+canvas.removeEventListener('mousemove', moveFruit);
+canvas.removeEventListener('touchstart', dropFruit);
+canvas.removeEventListener('touchmove', moveFruit);
 
-function dropFruit(e) {
-    if (isGameOver) {
-        resetGame();
-    } else {
+// 新しいイベントハンドラを登録
+canvas.addEventListener('touchmove', handleTouchMove);
+canvas.addEventListener('touchend', handleTouchEnd);
+
+// マウス操作用のイベントも残しておく（PCでのテスト用）
+canvas.addEventListener('mousemove', handleTouchMove);
+canvas.addEventListener('mousedown', handleMouseDown);
+canvas.addEventListener('mouseup', handleMouseUp);
+
+
+function handleTouchMove(e) {
+    if (activeFruit && !isGameOver) {
+        e.preventDefault();
+        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = clientX - rect.left;
+        activeFruit.x = Math.max(activeFruit.radius, Math.min(mouseX, gameWidth - activeFruit.radius));
+    }
+}
+
+function handleTouchEnd(e) {
+    if (activeFruit && !isGameOver) {
         const isOver = fallingFruits.some(fruit => fruit.y - fruit.radius <= topBoundary);
         if (isOver) {
             isGameOver = true;
             return;
         }
 
-        if (activeFruit) {
-            fallingFruits.push(activeFruit);
-            activeFruit = null;
-            setTimeout(createFruit, 1000);
-        }
+        fallingFruits.push(activeFruit);
+        activeFruit = null;
+        setTimeout(createFruit, 1000);
     }
 }
 
-// フルーツを動かすイベント (マウスとタッチの両方に対応)
-canvas.addEventListener('mousemove', moveFruit);
-canvas.addEventListener('touchmove', moveFruit);
-
-function moveFruit(e) {
-    if (activeFruit && !isGameOver) {
-        e.preventDefault();
-
-        let clientX;
-        if (e.type.includes('touch')) {
-            clientX = e.touches[0].clientX;
-        } else {
-            clientX = e.clientX;
-        }
-
-        const rect = canvas.getBoundingClientRect();
-        const mouseX = clientX - rect.left;
-        activeFruit.x = Math.max(activeFruit.radius, Math.min(mouseX, gameWidth - activeFruit.radius));
+function handleMouseDown(e) {
+    // マウスのクリックでは、タッチ操作と同様にすぐにフルーツを落とす
+    if (isGameOver) {
+        resetGame();
+    } else {
+        dropFruit();
     }
 }
+
+function handleMouseUp(e) {
+    // マウスを離したときにフルーツを落とす動作は今回は不要
+}
+
 
 // ゲームループ
 function gameLoop() {
