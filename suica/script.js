@@ -9,7 +9,6 @@ const gameWidth = 400;
 const gameHeight = 600;
 const topBoundary = 100; // フルーツを落とす位置のライン
 
-// 基礎となる物理係数
 const baseRestitution = 0.2; 
 const basePushFactor = 0.8; 
 const collisionIterations = 4;
@@ -68,13 +67,11 @@ class Fruit {
         this.x += this.vx;
         this.y += this.vy;
 
-        // 速度の上限設定
         if (this.vx > maxVelocity) this.vx = maxVelocity;
         if (this.vx < -maxVelocity) this.vx = -maxVelocity;
         if (this.vy > maxVelocity) this.vy = maxVelocity;
         if (this.vy < -maxVelocity) this.vy = -maxVelocity;
 
-        // 壁との衝突
         if (this.x + this.radius > gameWidth) {
             this.x = gameWidth - this.radius;
             this.vx *= -baseRestitution;
@@ -83,13 +80,11 @@ class Fruit {
             this.vx *= -baseRestitution;
         }
 
-        // 床との衝突
         if (this.y + this.radius > gameHeight) {
             this.y = gameHeight - this.radius;
             this.vy *= -baseRestitution;
         }
         
-        // 速度が非常に小さくなったら、速度を0にする
         if (Math.abs(this.vx) < minVelocity) {
             this.vx = 0;
         }
@@ -99,13 +94,11 @@ class Fruit {
     }
 }
 
-// スコアを更新し、表示を更新する関数
 function updateScore(points) {
     score += points;
     scoreDisplay.textContent = `Score: ${score}`;
 }
 
-// 衝突処理
 function handleCollisions() {
     for (let i = 0; i < fallingFruits.length; i++) {
         for (let j = i + 1; j < fallingFruits.length; j++) {
@@ -118,36 +111,29 @@ function handleCollisions() {
             const minDistance = fruit1.radius + fruit2.radius;
 
             if (distance < minDistance) {
-                // フルーツが同じ種類なら進化
                 if (fruit1.level === fruit2.level && fruit1.level < fruits.length - 1) {
                     const newLevel = fruit1.level + 1;
                     const newFruitData = fruits[newLevel];
                     const newX = (fruit1.x + fruit2.x) / 2;
                     const newY = (fruit1.y + fruit2.y) / 2;
                     
-                    // 衝突した2つのフルーツを削除
                     fallingFruits.splice(j, 1);
                     fallingFruits.splice(i, 1);
                     
-                    // 新しいフルーツを生成
                     fallingFruits.push(new Fruit(newX, newY, newFruitData.radius, newFruitData.color, newLevel));
                     
-                    // スコアを加算
                     updateScore(scoreTable[newLevel]);
                     return;
                 }
                 
-                // フルーツが重ならないように位置と速度を調整
                 const angle = Math.atan2(dy, dx);
                 const overlap = minDistance - distance;
 
-                // 位置の調整
                 fruit1.x += Math.cos(angle) * overlap / 2;
                 fruit1.y += Math.sin(angle) * overlap / 2;
                 fruit2.x -= Math.cos(angle) * overlap / 2;
                 fruit2.y -= Math.sin(angle) * overlap / 2;
 
-                // 速度の調整
                 const v1x = fruit1.vx;
                 const v1y = fruit1.vy;
                 const v2x = fruit2.vx;
@@ -160,7 +146,6 @@ function handleCollisions() {
                 const newV2x = (v2x * (mass2 - mass1) + 2 * mass1 * v1x) / (mass1 + mass2);
                 const newV2y = (v2y * (mass2 - mass1) + 2 * mass1 * v1y) / (mass1 + mass2);
                 
-                // フルーツのサイズに応じて反発係数を動的に決定
                 const dynamicRestitution = baseRestitution / Math.min(fruit1.radius, fruit2.radius) * 20;
 
                 fruit1.vx = newV1x * dynamicRestitution;
@@ -168,7 +153,6 @@ function handleCollisions() {
                 fruit2.vx = newV2x * dynamicRestitution;
                 fruit2.vy = newV2y * dynamicRestitution;
 
-                // フルーツのサイズに応じて押し出し係数を動的に決定
                 const dynamicPushFactor = basePushFactor / Math.min(fruit1.radius, fruit2.radius) * 20;
                 const pushDirectionX = (newV1y - newV2y) * (dy / distance) - (newV1x - newV2x) * (dx / distance);
                 
@@ -179,14 +163,12 @@ function handleCollisions() {
     }
 }
 
-// フルーツを生成
 function createFruit() {
     currentFruitIndex = Math.floor(Math.random() * 5);
     const fruitData = fruits[currentFruitIndex];
     activeFruit = new Fruit(gameWidth / 2, topBoundary, fruitData.radius, fruitData.color, currentFruitIndex);
 }
 
-// ゲームオーバー画面を描画する関数
 function drawGameOver() {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.fillRect(0, 0, gameWidth, gameHeight);
@@ -198,7 +180,6 @@ function drawGameOver() {
     ctx.fillText('タップしてリスタート', gameWidth / 2, gameHeight / 2 + 20);
 }
 
-// ゲームをリセットする関数
 function resetGame() {
     isGameOver = false;
     score = 0;
@@ -208,8 +189,11 @@ function resetGame() {
     gameLoop();
 }
 
-// マウスやタップでフルーツを落とす
-canvas.addEventListener('mousedown', () => {
+// フルーツを落とすイベント (マウスとタッチの両方に対応)
+canvas.addEventListener('mousedown', dropFruit);
+canvas.addEventListener('touchstart', dropFruit);
+
+function dropFruit(e) {
     if (isGameOver) {
         resetGame();
     } else {
@@ -225,16 +209,29 @@ canvas.addEventListener('mousedown', () => {
             setTimeout(createFruit, 1000);
         }
     }
-});
+}
 
-// マウスを動かすとフルーツが追従
-canvas.addEventListener('mousemove', (e) => {
+// フルーツを動かすイベント (マウスとタッチの両方に対応)
+canvas.addEventListener('mousemove', moveFruit);
+canvas.addEventListener('touchmove', moveFruit);
+
+function moveFruit(e) {
     if (activeFruit && !isGameOver) {
+        e.preventDefault(); // スクロール防止
+
+        let clientX;
+        // マウスとタッチで座標の取得方法を分ける
+        if (e.type.includes('touch')) {
+            clientX = e.touches[0].clientX;
+        } else {
+            clientX = e.clientX;
+        }
+
         const rect = canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
+        const mouseX = clientX - rect.left;
         activeFruit.x = Math.max(activeFruit.radius, Math.min(mouseX, gameWidth - activeFruit.radius));
     }
-});
+}
 
 // ゲームループ
 function gameLoop() {
