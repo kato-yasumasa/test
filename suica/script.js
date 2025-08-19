@@ -3,17 +3,17 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const scoreDisplay = document.getElementById('score');
 
-// ゲーム設定
-const gravity = 0.5;
-const gameWidth = 360; 
-
-// 変更箇所：画面の高さに合わせてゲームの高さを動的に設定
-const scoreHeight = scoreDisplay.clientHeight;
-const gameHeight = window.innerHeight - scoreHeight;
-canvas.width = gameWidth;
-canvas.height = gameHeight;
+// 変更箇所：キャンバスのサイズをHTML/CSSから取得
+const gameWidth = canvas.clientWidth;
+const gameHeight = canvas.clientHeight;
 const topBoundary = 100;
 
+// ★修正点：キャンバスの描画サイズを明示的に設定
+canvas.width = gameWidth;
+canvas.height = gameHeight;
+
+// ゲーム設定
+const gravity = 0.5;
 const baseRestitution = 0.2; 
 const basePushFactor = 0.8; 
 const collisionIterations = 4;
@@ -200,6 +200,7 @@ canvas.addEventListener('touchend', handleTouchEnd);
 canvas.addEventListener('mousemove', handleTouchMove);
 canvas.addEventListener('mousedown', handleMouseDown);
 canvas.addEventListener('mouseup', handleMouseUp);
+
 
 function handleTouchMove(e) {
     if (activeFruit && !isGameOver) {
