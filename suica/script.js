@@ -189,12 +189,6 @@ function resetGame() {
     gameLoop();
 }
 
-// 既存のマウスイベントを削除し、タッチイベントに統一
-canvas.removeEventListener('mousedown', dropFruit);
-canvas.removeEventListener('mousemove', moveFruit);
-canvas.removeEventListener('touchstart', dropFruit);
-canvas.removeEventListener('touchmove', moveFruit);
-
 // 新しいイベントハンドラを登録
 canvas.addEventListener('touchmove', handleTouchMove);
 canvas.addEventListener('touchend', handleTouchEnd);
@@ -234,7 +228,8 @@ function handleMouseDown(e) {
     if (isGameOver) {
         resetGame();
     } else {
-        dropFruit();
+        // 修正箇所：handleTouchEndを呼び出すように変更
+        handleTouchEnd();
     }
 }
 
