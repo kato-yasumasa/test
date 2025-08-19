@@ -3,14 +3,10 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const scoreDisplay = document.getElementById('score');
 
-// 変更箇所：ゲームの解像度をスマホ向けに変更
-const gameWidth = 360;
-const gameHeight = 720;
-canvas.width = gameWidth;
-canvas.height = gameHeight;
-
 // ゲーム設定
 const gravity = 0.5;
+const gameWidth = 360; // HTMLと一致
+const gameHeight = 720; // HTMLと一致
 const topBoundary = 100; // フルーツを落とす位置のライン
 
 const baseRestitution = 0.2; 
