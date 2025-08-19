@@ -6,7 +6,12 @@ const scoreDisplay = document.getElementById('score');
 // ゲーム設定
 const gravity = 0.5;
 const gameWidth = 360; 
-const gameHeight = 720;
+
+// 変更箇所：画面の高さに合わせてゲームの高さを動的に設定
+const scoreHeight = scoreDisplay.clientHeight;
+const gameHeight = window.innerHeight - scoreHeight;
+canvas.width = gameWidth;
+canvas.height = gameHeight;
 const topBoundary = 100;
 
 const baseRestitution = 0.2; 
@@ -189,15 +194,12 @@ function resetGame() {
     gameLoop();
 }
 
-// 新しいイベントハンドラを登録
 canvas.addEventListener('touchmove', handleTouchMove);
 canvas.addEventListener('touchend', handleTouchEnd);
 
-// マウス操作用のイベントも残しておく（PCでのテスト用）
 canvas.addEventListener('mousemove', handleTouchMove);
 canvas.addEventListener('mousedown', handleMouseDown);
 canvas.addEventListener('mouseup', handleMouseUp);
-
 
 function handleTouchMove(e) {
     if (activeFruit && !isGameOver) {
@@ -224,19 +226,16 @@ function handleTouchEnd(e) {
 }
 
 function handleMouseDown(e) {
-    // マウスのクリックでは、タッチ操作と同様にすぐにフルーツを落とす
     if (isGameOver) {
         resetGame();
     } else {
-        // 修正箇所：handleTouchEndを呼び出すように変更
         handleTouchEnd();
     }
 }
 
 function handleMouseUp(e) {
-    // マウスを離したときにフルーツを落とす動作は今回は不要
+    // 今回は使用しない
 }
-
 
 // ゲームループ
 function gameLoop() {
