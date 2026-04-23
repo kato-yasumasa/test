@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>３マッチパズル</title>
+    <title>３マッチパズル - 急須全消し改善版</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -17,84 +17,16 @@
             font-family: 'Inter', sans-serif;
             color: #333;
             overflow: hidden;
-            touch-action: none; /* ブラウザのデフォルトスワイプを無効化 */
+            touch-action: none;
         }
-
-        h1 {
-            margin-bottom: 20px;
-            color: #4a4a4a;
-            font-size: 2.5em;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-        }
-
-        #time-bar-container {
-            width: 90%;
-            max-width: 600px;
-            height: 20px;
-            background-color: #ccc;
-            border-radius: 10px;
-            margin-bottom: 15px;
-            overflow: hidden;
-            box-shadow: inset 0 2px 5px rgba(0,0,0,0.2);
-        }
-
-        #time-bar-fill {
-            height: 100%;
-            width: 100%;
-            background-color: #4CAF50;
-            border-radius: 10px;
-            transition: width 0.9s linear;
-        }
-
-        #game-container {
-            border: 4px solid #8B4513;
-            background-color: #fff;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-            border-radius: 15px;
-            padding: 10px;
-            position: relative;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        canvas {
-            display: block;
-            background-color: #eee;
-            border-radius: 10px;
-            cursor: pointer;
-        }
-
-        #game-over-popup {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            display: none;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 2000;
-        }
-
-        #game-over-popup p {
-            color: white;
-            font-size: 3em;
-            font-weight: bold;
-            margin-bottom: 30px;
-        }
-
-        #game-over-popup button {
-            background-color: #FF4500;
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 8px;
-            font-size: 1.5em;
-            cursor: pointer;
-        }
+        h1 { margin-bottom: 20px; color: #4a4a4a; font-size: 2.5em; text-shadow: 2px 2px 4px rgba(0,0,0,0.1); }
+        #time-bar-container { width: 90%; max-width: 600px; height: 20px; background-color: #ccc; border-radius: 10px; margin-bottom: 15px; overflow: hidden; box-shadow: inset 0 2px 5px rgba(0,0,0,0.2); }
+        #time-bar-fill { height: 100%; width: 100%; background-color: #4CAF50; border-radius: 10px; transition: width 0.9s linear; }
+        #game-container { border: 4px solid #8B4513; background-color: #fff; box-shadow: 0 8px 16px rgba(0,0,0,0.2); border-radius: 15px; padding: 10px; position: relative; display: flex; justify-content: center; align-items: center; }
+        canvas { display: block; background-color: #eee; border-radius: 10px; cursor: pointer; }
+        #game-over-popup { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; }
+        #game-over-popup p { color: white; font-size: 3em; font-weight: bold; margin-bottom: 30px; }
+        #game-over-popup button { background-color: #FF4500; color: white; border: none; padding: 15px 30px; border-radius: 8px; font-size: 1.5em; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -123,15 +55,21 @@
         const GRID_COLS = 8;
         const GRID_ROWS = 8;
         const ITEM_TYPES = 5;
+
+        // 特殊アイテム種別
+        const BOMB_TYPE = 99;      // 爆竹
+        const ROCKET_V_TYPE = 98;   // とうがらし1
+        const ROCKET_H_TYPE = 97;   // とうがらし2
+        const TEAPOT_TYPE = 96;     // 急須
+
         const SWAP_ANIMATION_DURATION = 200;
         const MATCH_FADE_DURATION = 300;
         const DROP_ANIMATION_DURATION = 400;
         
         const MAX_GAME_TIME = 60;
         const TIME_BONUS_PER_MATCH = 3;
-        const LOW_TIME_THRESHOLD_RATIO = 0.1;
 
-        let gameBoard = [];
+        let gameBoard = []; // オブジェクト形式で保持: { type: number, targetColor: number|null }
         let selectedTile = null;
         let isProcessing = false;
         let gameTime = MAX_GAME_TIME;
@@ -140,20 +78,28 @@
         let isShaking = false;
         let shakeAnimationId = null;
 
-        const itemImages = [];
+        const itemImages = {};
+        const imageFiles = [
+            { id: 0, name: '1' }, { id: 1, name: '2' }, { id: 2, name: '3' }, 
+            { id: 3, name: '4' }, { id: 4, name: '5' },
+            { id: BOMB_TYPE, name: 'bomb' },
+            { id: ROCKET_V_TYPE, name: 'rocket1' },
+            { id: ROCKET_H_TYPE, name: 'rocket2' },
+            { id: TEAPOT_TYPE, name: 'teapot' }
+        ];
         let loadedImages = 0;
 
         function loadImages(callback) {
-            for (let i = 1; i <= ITEM_TYPES; i++) {
+            imageFiles.forEach(file => {
                 const img = new Image();
-                img.src = `img/${i}.png`;
+                img.src = `img/${file.name}.png`;
                 img.onload = () => {
                     loadedImages++;
-                    if (loadedImages === ITEM_TYPES) callback();
+                    if (loadedImages === imageFiles.length) callback();
                 };
-                img.onerror = () => console.error(`Failed to load: img/${i}.png`);
-                itemImages.push(img);
-            }
+                img.onerror = () => console.error(`Failed to load: img/${file.name}.png`);
+                itemImages[file.id] = img;
+            });
         }
 
         function calculateCanvasSize() {
@@ -171,14 +117,14 @@
             gameBoard = Array(GRID_ROWS).fill(null).map(() => Array(GRID_COLS).fill(null));
             for (let r = 0; r < GRID_ROWS; r++) {
                 for (let c = 0; c < GRID_COLS; c++) {
-                    let newItem;
+                    let newType;
                     do {
-                        newItem = Math.floor(Math.random() * ITEM_TYPES);
+                        newType = Math.floor(Math.random() * ITEM_TYPES);
                     } while (
-                        (c >= 2 && gameBoard[r][c - 1] === newItem && gameBoard[r][c - 2] === newItem) ||
-                        (r >= 2 && gameBoard[r - 1][c] === newItem && gameBoard[r - 2][c] === newItem)
+                        (c >= 2 && gameBoard[r][c - 1].type === newType && gameBoard[r][c - 2].type === newType) ||
+                        (r >= 2 && gameBoard[r - 1][c].type === newType && gameBoard[r - 2][c].type === newType)
                     );
-                    gameBoard[r][c] = newItem;
+                    gameBoard[r][c] = { type: newType, targetColor: null };
                 }
             }
             drawBoard();
@@ -193,30 +139,25 @@
             for (let r = 0; r < GRID_ROWS; r++) {
                 for (let c = 0; c < GRID_COLS; c++) {
                     if (excludeSet.has(`${r},${c}`)) continue;
-
-                    const itemType = gameBoard[r][c];
-                    if (itemType !== null) {
+                    const tile = gameBoard[r][c];
+                    if (tile && tile.type !== null) {
                         let offsetX = 0, offsetY = 0;
                         if (isShaking) {
                             offsetX = Math.sin((performance.now() * shakeSpeed) + r * 1.2 + c * 0.8) * shakeStrength;
                             offsetY = Math.cos((performance.now() * shakeSpeed) + r * 0.8 + c * 1.2) * shakeStrength;
                         }
-
                         ctx.fillStyle = '#f8f8f8';
                         ctx.fillRect(c * TILE_SIZE + offsetX, r * TILE_SIZE + offsetY, TILE_SIZE, TILE_SIZE);
-
                         ctx.globalAlpha = alpha;
-                        const img = itemImages[itemType];
+                        const img = itemImages[tile.type];
                         if (img && img.complete) {
                             ctx.drawImage(img, c * TILE_SIZE + offsetX, r * TILE_SIZE + offsetY, TILE_SIZE, TILE_SIZE);
                         }
                         ctx.globalAlpha = 1;
-
                         ctx.strokeStyle = '#333';
                         ctx.lineWidth = 1;
                         ctx.strokeRect(c * TILE_SIZE + offsetX, r * TILE_SIZE + offsetY, TILE_SIZE, TILE_SIZE);
                     }
-
                     if (selectedTile && selectedTile.row === r && selectedTile.col === c) {
                         ctx.strokeStyle = '#FFD700';
                         ctx.lineWidth = 4;
@@ -226,17 +167,20 @@
             }
         }
 
-        // --- 操作イベント (マウス & タッチ共通化) ---
+        // --- 操作イベント ---
         let startX, startY;
-
         function handleStart(x, y) {
             if (isProcessing || isGameOver) return;
             const rect = canvas.getBoundingClientRect();
             const col = Math.floor((x - rect.left) / TILE_SIZE);
             const row = Math.floor((y - rect.top) / TILE_SIZE);
             if (row >= 0 && row < GRID_ROWS && col >= 0 && col < GRID_COLS) {
-                startX = x;
-                startY = y;
+                const tile = gameBoard[row][col];
+                if (tile.type >= TEAPOT_TYPE) {
+                    useSpecialItem(row, col, tile);
+                    return;
+                }
+                startX = x; startY = y;
                 selectedTile = { row, col };
                 drawBoard();
             }
@@ -244,55 +188,72 @@
 
         async function handleEnd(x, y) {
             if (!selectedTile || isProcessing || isGameOver) return;
-            const dx = x - startX;
-            const dy = y - startY;
+            const dx = x - startX, dy = y - startY;
             const threshold = TILE_SIZE * 0.4;
             let targetTile = null;
-
-            if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > threshold) {
-                targetTile = { row: selectedTile.row, col: selectedTile.col + (dx > 0 ? 1 : -1) };
-            } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > threshold) {
-                targetTile = { row: selectedTile.row + (dy > 0 ? 1 : -1), col: selectedTile.col };
-            }
+            if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > threshold) targetTile = { row: selectedTile.row, col: selectedTile.col + (dx > 0 ? 1 : -1) };
+            else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > threshold) targetTile = { row: selectedTile.row + (dy > 0 ? 1 : -1), col: selectedTile.col };
 
             if (targetTile && isValidSwap(selectedTile, targetTile)) {
                 isProcessing = true;
                 await animateSwap(selectedTile, targetTile);
-                if (findMatches().length > 0) {
-                    await processGameCycle();
-                } else {
-                    await animateSwap(targetTile, selectedTile);
-                }
+                if (findMatches().length > 0) await processGameCycle(targetTile);
+                else await animateSwap(targetTile, selectedTile);
             }
-            selectedTile = null;
-            isProcessing = false;
-            drawBoard();
+            selectedTile = null; isProcessing = false; drawBoard();
         }
 
-        // マウスイベント
+        async function useSpecialItem(r, c, tile) {
+            isProcessing = true;
+            const affectedTiles = [];
+            const type = tile.type;
+
+            if (type === BOMB_TYPE) {
+                for (let i = r - 2; i <= r + 2; i++) {
+                    for (let j = c - 2; j <= c + 2; j++) {
+                        if (i >= 0 && i < GRID_ROWS && j >= 0 && j < GRID_COLS) affectedTiles.push({ row: i, col: j });
+                    }
+                }
+            } else if (type === ROCKET_V_TYPE) {
+                for (let i = 0; i < GRID_ROWS; i++) affectedTiles.push({ row: i, col: c });
+            } else if (type === ROCKET_H_TYPE) {
+                for (let j = 0; j < GRID_COLS; j++) affectedTiles.push({ row: r, col: j });
+            } else if (type === TEAPOT_TYPE) {
+                // 急須が保持している「targetColor」と同じ種類のピースを全消去
+                const targetColor = tile.targetColor;
+                for (let i = 0; i < GRID_ROWS; i++) {
+                    for (let j = 0; j < GRID_COLS; j++) {
+                        if (gameBoard[i][j].type === targetColor || (i === r && j === c)) {
+                            affectedTiles.push({ row: i, col: j });
+                        }
+                    }
+                }
+            }
+            addTime(8);
+            await animateMatchRemoval(affectedTiles);
+            dropTiles(); await animateDrop();
+            fillEmptyTiles(); await animateFill();
+            await processGameCycle();
+            isProcessing = false;
+        }
+
         canvas.addEventListener('mousedown', (e) => handleStart(e.clientX, e.clientY));
         window.addEventListener('mouseup', (e) => handleEnd(e.clientX, e.clientY));
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleStart(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+        canvas.addEventListener('touchend', (e) => handleEnd(e.changedTouches[0].clientX, e.changedTouches[0].clientY));
 
-        // タッチイベント
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            handleStart(e.touches[0].clientX, e.touches[0].clientY);
-        }, { passive: false });
-        canvas.addEventListener('touchend', (e) => {
-            handleEnd(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
-        });
-
-        // --- コアロジック ---
+        // --- ロジック ---
         function isValidSwap(t1, t2) {
             if (t2.row < 0 || t2.row >= GRID_ROWS || t2.col < 0 || t2.col >= GRID_COLS) return false;
             return Math.abs(t1.row - t2.row) + Math.abs(t1.col - t2.col) === 1;
         }
 
         async function animateSwap(t1, t2) {
-            const i1 = gameBoard[t1.row][t1.col], i2 = gameBoard[t2.row][t2.col];
+            const tile1 = { ...gameBoard[t1.row][t1.col] };
+            const tile2 = { ...gameBoard[t2.row][t2.col] };
             const animated = [
-                { type: i1, x: t1.col * TILE_SIZE, y: t1.row * TILE_SIZE, tx: t2.col * TILE_SIZE, ty: t2.row * TILE_SIZE },
-                { type: i2, x: t2.col * TILE_SIZE, y: t2.row * TILE_SIZE, tx: t1.col * TILE_SIZE, ty: t1.row * TILE_SIZE }
+                { type: tile1.type, x: t1.col * TILE_SIZE, y: t1.row * TILE_SIZE, tx: t2.col * TILE_SIZE, ty: t2.row * TILE_SIZE },
+                { type: tile2.type, x: t2.col * TILE_SIZE, y: t2.row * TILE_SIZE, tx: t1.col * TILE_SIZE, ty: t1.row * TILE_SIZE }
             ];
             const start = performance.now();
             return new Promise(resolve => {
@@ -304,60 +265,88 @@
                         ctx.drawImage(itemImages[t.type], cx, cy, TILE_SIZE, TILE_SIZE);
                     });
                     if (progress < 1) requestAnimationFrame(frame);
-                    else {
-                        gameBoard[t1.row][t1.col] = i2; gameBoard[t2.row][t2.col] = i1;
-                        drawBoard(); resolve();
-                    }
+                    else { gameBoard[t1.row][t1.col] = tile2; gameBoard[t2.row][t2.col] = tile1; drawBoard(); resolve(); }
                 }
                 requestAnimationFrame(frame);
             });
         }
 
-        async function processGameCycle() {
+        async function processGameCycle(lastPlacedTile = null) {
             while (true) {
-                const matches = findMatches();
-                if (matches.length === 0) break;
+                const matchResult = findMatches();
+                if (matchResult.length === 0) break;
+
+                let specialItem = null;
+                if (lastPlacedTile) {
+                    const hMatches = matchResult.filter(m => m.row === lastPlacedTile.row && m.dir === 'h');
+                    const vMatches = matchResult.filter(m => m.col === lastPlacedTile.col && m.dir === 'v');
+                    
+                    // 消す前のタイルの色を取得（特殊アイテムに引き継ぐ用）
+                    const originalColor = gameBoard[lastPlacedTile.row][lastPlacedTile.col].type;
+
+                    if (hMatches.length >= 5 || vMatches.length >= 5) {
+                        specialItem = { type: TEAPOT_TYPE, targetColor: originalColor };
+                    } else if (hMatches.length >= 3 && vMatches.length >= 3) {
+                        specialItem = { type: BOMB_TYPE, targetColor: null };
+                    } else if (vMatches.length >= 4) {
+                        specialItem = { type: ROCKET_V_TYPE, targetColor: null };
+                    } else if (hMatches.length >= 4) {
+                        specialItem = { type: ROCKET_H_TYPE, targetColor: null };
+                    }
+                }
+
                 addTime(TIME_BONUS_PER_MATCH);
-                await animateMatchRemoval(matches);
-                dropTiles();
-                await animateDrop();
-                fillEmptyTiles();
-                await animateFill();
+                await animateMatchRemoval(matchResult);
+                
+                if (specialItem && lastPlacedTile) {
+                    gameBoard[lastPlacedTile.row][lastPlacedTile.col] = specialItem;
+                }
+
+                dropTiles(); await animateDrop();
+                fillEmptyTiles(); await animateFill();
+                lastPlacedTile = null;
             }
         }
 
         function findMatches() {
-            const matches = new Set();
+            const res = [];
             for (let r = 0; r < GRID_ROWS; r++) {
                 for (let c = 0; c < GRID_COLS - 2; c++) {
-                    const t = gameBoard[r][c];
-                    if (t !== null && t === gameBoard[r][c+1] && t === gameBoard[r][c+2]) {
-                        [c, c+1, c+2].forEach(cc => matches.add(`${r},${cc}`));
+                    const t = gameBoard[r][c].type;
+                    if (t !== null && t < 10 && t === gameBoard[r][c+1].type && t === gameBoard[r][c+2].type) {
+                        let count = 0; while(c+count < GRID_COLS && gameBoard[r][c+count].type === t) { res.push({row:r, col:c+count, dir:'h'}); count++; }
+                        c += count - 1;
                     }
                 }
             }
             for (let c = 0; c < GRID_COLS; c++) {
                 for (let r = 0; r < GRID_ROWS - 2; r++) {
-                    const t = gameBoard[r][c];
-                    if (t !== null && t === gameBoard[r+1][c] && t === gameBoard[r+2][c]) {
-                        [r, r+1, r+2].forEach(rr => matches.add(`${rr},${c}`));
+                    const t = gameBoard[r][c].type;
+                    if (t !== null && t < 10 && t === gameBoard[r+1][c].type && t === gameBoard[r+2][c].type) {
+                        let count = 0; while(r+count < GRID_ROWS && gameBoard[r+count][c].type === t) { res.push({row:r+count, col:c, dir:'v'}); count++; }
+                        r += count - 1;
                     }
                 }
             }
-            return Array.from(matches).map(s => { const [r, c] = s.split(',').map(Number); return {row:r, col:c}; });
+            return res;
         }
 
         async function animateMatchRemoval(matches) {
             const start = performance.now();
+            const unique = []; const seen = new Set();
+            matches.forEach(m => { const k=`${m.row},${m.col}`; if(!seen.has(k)){ seen.add(k); unique.push(m); }});
             return new Promise(resolve => {
                 function frame() {
                     const progress = Math.min((performance.now() - start) / MATCH_FADE_DURATION, 1);
-                    drawBoard(1, matches);
+                    drawBoard(1, unique);
                     ctx.globalAlpha = 1 - progress;
-                    matches.forEach(m => ctx.drawImage(itemImages[gameBoard[m.row][m.col]], m.col * TILE_SIZE, m.row * TILE_SIZE, TILE_SIZE, TILE_SIZE));
+                    unique.forEach(m => { 
+                        const tile = gameBoard[m.row][m.col];
+                        if(tile && itemImages[tile.type]) ctx.drawImage(itemImages[tile.type], m.col*TILE_SIZE, m.row*TILE_SIZE, TILE_SIZE, TILE_SIZE); 
+                    });
                     ctx.globalAlpha = 1;
                     if (progress < 1) requestAnimationFrame(frame);
-                    else { matches.forEach(m => gameBoard[m.row][m.col] = null); drawBoard(); resolve(); }
+                    else { unique.forEach(m => gameBoard[m.row][m.col] = { type: null, targetColor: null }); drawBoard(); resolve(); }
                 }
                 requestAnimationFrame(frame);
             });
@@ -367,40 +356,32 @@
             for (let c = 0; c < GRID_COLS; c++) {
                 let empty = 0;
                 for (let r = GRID_ROWS - 1; r >= 0; r--) {
-                    if (gameBoard[r][c] === null) empty++;
-                    else if (empty > 0) { gameBoard[r+empty][c] = gameBoard[r][c]; gameBoard[r][c] = null; }
+                    if (gameBoard[r][c].type === null) empty++;
+                    else if (empty > 0) { gameBoard[r+empty][c] = { ...gameBoard[r][c] }; gameBoard[r][c] = { type: null, targetColor: null }; }
                 }
             }
         }
-
         async function animateDrop() { drawBoard(); return new Promise(r => setTimeout(r, DROP_ANIMATION_DURATION)); }
-
+        
         function fillEmptyTiles() {
             for (let r = 0; r < GRID_ROWS; r++) {
                 for (let c = 0; c < GRID_COLS; c++) {
-                    if (gameBoard[r][c] === null) gameBoard[r][c] = Math.floor(Math.random() * ITEM_TYPES);
+                    if (gameBoard[r][c].type === null) gameBoard[r][c] = { type: Math.floor(Math.random() * ITEM_TYPES), targetColor: null };
                 }
             }
         }
-
         async function animateFill() { drawBoard(); return new Promise(r => setTimeout(r, 200)); }
 
         function updateTimeBarDisplay() {
             const p = (gameTime / MAX_GAME_TIME) * 100;
             timeBarFill.style.width = `${p}%`;
             timeBarFill.style.backgroundColor = p > 50 ? '#4CAF50' : (p > 20 ? '#FFD700' : '#FF6347');
-            if (gameTime <= MAX_GAME_TIME * LOW_TIME_THRESHOLD_RATIO && !isShaking) startShaking();
-            else if (gameTime > MAX_GAME_TIME * LOW_TIME_THRESHOLD_RATIO && isShaking) stopShaking();
+            if (gameTime <= MAX_GAME_TIME * 0.1 && !isShaking) startShaking();
+            else if (gameTime > MAX_GAME_TIME * 0.1 && isShaking) stopShaking();
         }
-
         function updateTime() { gameTime--; updateTimeBarDisplay(); if (gameTime <= 0) gameOver(); }
         function addTime(amt) { gameTime = Math.min(gameTime + amt, MAX_GAME_TIME); updateTimeBarDisplay(); }
-
-        function gameOver() {
-            clearInterval(timeUpdateInterval); stopShaking(); isGameOver = true;
-            gameOverPopup.style.display = 'flex';
-        }
-
+        function gameOver() { clearInterval(timeUpdateInterval); stopShaking(); isGameOver = true; gameOverPopup.style.display = 'flex'; }
         function startShaking() {
             isShaking = true;
             if (!shakeAnimationId) {
@@ -408,7 +389,6 @@
                 shakeAnimationId = requestAnimationFrame(loop);
             }
         }
-
         function stopShaking() { isShaking = false; if (shakeAnimationId) cancelAnimationFrame(shakeAnimationId); shakeAnimationId = null; drawBoard(); }
 
         function startGame() {
