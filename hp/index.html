@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ポケカくじ</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background-color: #2c2c2c; /* 外側の背景（PCなどの画面表示用） */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* アプリ全体を覆うメインコンテナ（スマホ画面サイズ） */
+    .app-screen {
+      width: 100%;
+      max-width: 400px;
+      height: 100%;
+      max-height: 700px;
+      background-color: #333333;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      box-shadow: 0 0 20px rgba(0,0,0,0.8);
+      overflow: hidden;
+    }
+
+    /* ヘッダーエリア */
+    .header {
+      background-color: #ba2328;
+      padding: 16px 0;
+      text-align: center;
+      border-bottom: 4px solid #1a1a1a;
+      flex-shrink: 0;
+    }
+
+    .title-logo {
+      color: #ffffff;
+      font-size: 32px;
+      font-weight: 900;
+      font-style: italic;
+      letter-spacing: 1px;
+      text-shadow: 
+        3px 3px 0 #000,
+       -2px 2px 0 #000,
+        2px -2px 0 #000,
+       -2px -2px 0 #000,
+        0 4px 6px rgba(0,0,0,0.6);
+      display: inline-block;
+      transform: scaleY(1.1);
+    }
+
+    /* メインコンテンツエリア */
+    .content {
+      flex: 1;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start; /* ← 【変更】 space-between から flex-start に変更 */
+ 	  gap: 16px; /* ← 【追加】 各要素（くじ・説明文・ボタン）の間の間隔を一定にする */
+    }
+
+    .kuji-section {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* くじアイテム共通 */
+    .kuji-item {
+      width: 100%;
+      text-align: center;
+    }
+
+    .kuji-banner {
+      width: 100%;
+      padding: 10px;
+      border-radius: 4px;
+      color: white;
+      font-size: 22px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      border: 2px solid #ffffff;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+    }
+
+    .kuji-banner.extra {
+      background: linear-gradient(180deg, #f38321 0%, #d85c00 100%);
+    }
+
+    .kuji-banner.standard {
+      background: linear-gradient(180deg, #3d79e6 0%, #1e4eb4 100%);
+    }
+
+    /* 簡易ボールアイコン */
+    .ball-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      border: 2px solid #000;
+      background: #fff;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .ball-icon::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 50%;
+      border-radius: 15px 15px 0 0;
+    }
+
+    .ball-icon.master::before {
+      background-color: #832798;
+    }
+
+    .ball-icon.monster::before {
+      background-color: #e60012;
+    }
+
+    .ball-icon::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 8px;
+      height: 8px;
+      background: #fff;
+      border: 2px solid #000;
+      border-radius: 50%;
+    }
+
+    /* 回数テキスト */
+    .count-text {
+      color: #ffffff;
+      font-size: 13px;
+      margin-top: 2px;
+    }
+
+    .count-number {
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .ruby-top {
+      font-size: 10px;
+      display: block;
+      line-height: 1;
+    }
+
+    /* ナビゲーション・指示テキスト */
+    .instruction {
+      color: #ffffff;
+      font-size: 15px;
+      text-align: center;
+      margin: 10px 0;
+    }
+
+    .instruction ruby rt {
+      font-size: 10px;
+    }
+
+    /* ボタンエリア */
+    .action-area {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .btn-submit {
+      width: 70%;
+      padding: 12px 0;
+      background: linear-gradient(180deg, #9e3030 0%, #6e1c1c 100%);
+      color: #ffffff;
+      font-size: 24px;
+      font-weight: bold;
+      border: 3px solid #ffffff;
+      border-radius: 12px;
+      cursor: pointer;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+      transition: transform 0.1s;
+    }
+
+    .btn-submit:active {
+      transform: scale(0.96);
+    }
+
+    .cancel-wrapper {
+      width: 100%;
+      display: flex;
+      justify-content: flex-start;
+    }
+
+    .btn-cancel {
+      background-color: #4a4a4a;
+      color: #ffffff;
+      font-size: 16px;
+      font-weight: bold;
+      padding: 6px 18px;
+      border: 2px solid #ffffff;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    /* フッター赤いバンド */
+    .footer-bar {
+      height: 35px;
+      background-color: #ba2328;
+      width: 100%;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-screen">
+    <!-- ヘッダー -->
+    <header class="header">
+      <div class="title-logo">ポケカくじ</div>
+    </header>
+
+    <!-- メインエリア -->
+    <main class="content">
+      <div class="kuji-section">
+        <!-- エクストラくじ -->
+        <div class="kuji-item">
+          <div class="kuji-banner extra">
+            <span class="ball-icon master"></span>
+            <span>エクストラくじ</span>
+          </div>
+          <div class="count-text">
+            <span class="ruby-top">　かい</span>
+            <span class="count-number">1</span>回
+          </div>
+        </div>
+
+        <!-- スタンダードくじ -->
+        <div class="kuji-item">
+          <div class="kuji-banner standard">
+            <span class="ball-icon monster"></span>
+            <span>スタンダードくじ</span>
+          </div>
+          <div class="count-text">
+            <span class="ruby-top">　かい</span>
+            <span class="count-number">6</span>回
+          </div>
+        </div>
+      </div>
+
+      <!-- 説明テキスト -->
+      <div class="instruction">
+        ボタンを<ruby>押<rt>お</rt></ruby>して、くじ<ruby>引<rt>び</rt></ruby>きをスタートしてください
+      </div>
+
+      <!-- ボタンエリア -->
+      <div class="action-area">
+		<button type="button" class="btn-submit" onclick="location.href='result.html'">くじをひく</button>
+      </div>
+    </main>
+
+    <!-- フッター -->
+    <footer class="footer-bar"></footer>
+  </div>
+
+</body>
+</html>
