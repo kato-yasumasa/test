@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LINE風 リアルタイムWebチャット</title>
+  
+  <!-- Firebase SDK (v10 Compat版) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    body {
+      background-color: #f0f2f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .chat-container {
+      width: 100%;
+      max-width: 420px;
+      height: 90vh;
+      max-height: 750px;
+      background-color: #abc3d7; /* LINE風背景色 */
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    /* ヘッダー / ユーザー切替部 */
+    .chat-header {
+      background-color: #263238;
+      color: white;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 10;
+    }
+
+    .user-select-bar {
+      background-color: #1a2327;
+      color: #ccc;
+      padding: 6px 16px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .user-select-bar select {
+      background: #334148;
+      color: white;
+      border: none;
+      padding: 2px 8px;
+      border-radius: 4px;
+      outline: none;
+    }
+
+    /* メッセージエリア */
+    .chat-messages {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .message-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      max-width: 80%;
+    }
+
+    .message-row.sent {
+      align-self: flex-end;
+      flex-direction: row-reverse;
+    }
+
+    .message-row.received {
+      align-self: flex-start;
+    }
+
+    .sender-name {
+      font-size: 10px;
+      color: #555;
+      margin-bottom: 2px;
+    }
+
+    .bubble {
+      padding: 10px 14px;
+      border-radius: 18px;
+      font-size: 14px;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .sent .bubble {
+      background-color: #06C755;
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+    .received .bubble {
+      background-color: white;
+      color: #111;
+      border-bottom-left-radius: 4px;
+    }
+
+    .bubble-image {
+      max-width: 200px;
+      max-height: 200px;
+      border-radius: 12px;
+      display: block;
+      margin-bottom: 4px;
+      cursor: pointer;
+    }
+
+    .meta-info {
+      font-size: 10px;
+      color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 2px;
+    }
+
+    .sent .meta-info { align-items: flex-end; }
+    .received .meta-info { align-items: flex-start; }
+
+    /* プレビュー・スタンプ等 */
+    .image-preview-bar {
+      display: none;
+      padding: 8px 16px;
+      background-color: #eef2f5;
+      border-top: 1px solid #ddd;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .image-preview-bar img {
+      width: 45px;
+      height: 45px;
+      object-fit: cover;
+      border-radius: 6px;
+    }
+
+    .stamp-picker {
+      display: none;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      padding: 12px;
+      background: white;
+      border-top: 1px solid #ddd;
+      font-size: 28px;
+      text-align: center;
+    }
+
+    .stamp-item { cursor: pointer; }
+    .stamp-item:hover { transform: scale(1.2); }
+
+    /* 入力エリア */
+    .input-area {
+      background-color: white;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-top: 1px solid #e0e0e0;
+    }
+
+    .icon-btn {
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      color: #666;
+    }
+
+    .text-input {
+      flex: 1;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      padding: 8px 14px;
+      outline: none;
+      font-size: 14px;
+      background-color: #f8f9fa;
+    }
+
+    .send-btn {
+      background-color: #06C755;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #file-input { display: none; }
+  </style>
+</head>
+<body>
+
+<div class="chat-container">
+  <!-- ヘッダー -->
+  <div class="chat-header">
+    <div style="font-weight: bold; font-size: 16px;">グループトーク</div>
+    <div style="font-size: 11px; color: #06C755;">● 接続中</div>
+  </div>
+
+  <!-- テスト用：発言者の切替バー -->
+  <div class="user-select-bar">
+    <span>現在の送信者名:</span>
+    <select id="user-select" onchange="changeUser()">
+      <option value="ユーザーA">ユーザーA</option>
+      <option value="ユーザーB">ユーザーB</option>
+      <option value="ユーザーC">ユーザーC</option>
+    </select>
+  </div>
+
+  <!-- メッセージ表示部 -->
+  <div class="chat-messages" id="message-container"></div>
+
+  <!-- 画像プレビュー -->
+  <div class="image-preview-bar" id="preview-bar">
+    <img id="preview-img" src="" alt="preview">
+    <span style="font-size: 12px; color: #666;">画像を添付中</span>
+    <button onclick="clearImage()" style="background:#ff4d4f; color:white; border:none; border-radius:50%; width:20px; height:20px; cursor:pointer;">×</button>
+  </div>
+
+  <!-- スタンプ選択パネル -->
+  <div class="stamp-picker" id="stamp-picker">
+    <span class="stamp-item" onclick="sendStamp('👍')">👍</span>
+    <span class="stamp-item" onclick="sendStamp('❤️')">❤️</span>
+    <span class="stamp-item" onclick="sendStamp('😊')">😊</span>
+    <span class="stamp-item" onclick="sendStamp('🎉')">🎉</span>
+    <span class="stamp-item" onclick="sendStamp('🔥')">🔥</span>
+    <span class="stamp-item" onclick="sendStamp('🙌')">🙌</span>
+    <span class="stamp-item" onclick="sendStamp('✨')">✨</span>
+    <span class="stamp-item" onclick="sendStamp('🙏')">🙏</span>
+  </div>
+
+  <!-- 入力エリア -->
+  <div class="input-area">
+    <button class="icon-btn" onclick="document.getElementById('file-input').click()">📷</button>
+    <input type="file" id="file-input" accept="image/*" onchange="handleFileSelect(event)">
+    <button class="icon-btn" onclick="toggleStampPicker()">🙂</button>
+
+    <input type="text" id="text-input" class="text-input" placeholder="メッセージを入力..." onkeypress="handleKeyPress(event)">
+    <button class="send-btn" onclick="sendMessage()">➤</button>
+  </div>
+</div>
+
+<script>
+  // ==========================================
+  // 1. Firebaseの設定（ご自身の情報に置き換えてください）
+  // ==========================================
+  const firebaseConfig = {
+    apiKey: "AIzaSyCB5OYkOFf4GbNUXFUNzDE6zVenfi-xl5c",
+    authDomain: "testchat-e2d4c.firebaseapp.com",
+    projectId: "testchat-e2d4c",
+    storageBucket: "testchat-e2d4c.firebasestorage.app",
+    messagingSenderId: "337472356766",
+    appId: "1:337472356766:web:a30b9b66d742acdb50168f",
+    measurementId: "G-VCGTZHH60D"
+  };
+
+  // Firebaseの初期化
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  // 状態管理
+  let currentUser = "ユーザーA";
+  let selectedImageData = null;
+
+  function changeUser() {
+    currentUser = document.getElementById('user-select').value;
+    // ユーザー切り替え時に再描画
+    listenMessages();
+  }
+
+  // ==========================================
+  // 2. リアルタイムメッセージ受信 (Firestore)
+  // ==========================================
+  function listenMessages() {
+    // timestampの昇順（古い順）に取得
+    db.collection("messages").orderBy("timestamp", "asc")
+      .onSnapshot((snapshot) => {
+        const container = document.getElementById('message-container');
+        container.innerHTML = ''; // 一旦クリア
+
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          appendMessageToDOM(data);
+        });
+
+        // 最下部へスクロール
+        container.scrollTop = container.scrollHeight;
+      }, (error) => {
+        console.error("Firestore受信エラー:", error);
+      });
+  }
+
+  // 初期読み込み開始
+  listenMessages();
+
+  // ==========================================
+  // 3. メッセージ送信処理 (Firestoreへ追加)
+  // ==========================================
+  function sendMessage() {
+    const textInput = document.getElementById('text-input');
+    const text = textInput.value.trim();
+
+    if (!text && !selectedImageData) return;
+
+    // Firestoreの "messages" コレクションへ書き込み
+    db.collection("messages").add({
+      sender: currentUser,
+      text: text,
+      image: selectedImageData || null,
+      isStamp: false,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(() => {
+      textInput.value = '';
+      clearImage();
+    }).catch((error) => {
+      alert("送信に失敗しました: " + error.message);
+    });
+  }
+
+  function sendStamp(emoji) {
+    db.collection("messages").add({
+      sender: currentUser,
+      text: emoji,
+      image: null,
+      isStamp: true,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    toggleStampPicker();
+  }
+
+  // ==========================================
+  // 4. UI・描画関連ヘルパー
+  // ==========================================
+  function appendMessageToDOM(data) {
+    const container = document.getElementById('message-container');
+    const isMe = data.sender === currentUser;
+    
+    // 時刻表示のフォーマット
+    let timeStr = "";
+    if (data.timestamp && data.timestamp.toDate) {
+      const date = data.timestamp.toDate();
+      timeStr = String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0');
+    }
+
+    const row = document.createElement('div');
+    row.className = `message-row ${isMe ? 'sent' : 'received'}`;
+
+    let contentHtml = '<div>';
+    if (!isMe) {
+      contentHtml += `<div class="sender-name">${escapeHtml(data.sender)}</div>`;
+    }
+
+    if (data.image) {
+      contentHtml += `<img src="${data.image}" class="bubble-image" onclick="window.open('${data.image}')">`;
+    }
+
+    if (data.text) {
+      if (data.isStamp) {
+        contentHtml += `<div style="font-size: 48px; line-height: 1.2;">${data.text}</div>`;
+      } else {
+        contentHtml += `<div class="bubble">${escapeHtml(data.text)}</div>`;
+      }
+    }
+    contentHtml += '</div>';
+
+    const metaHtml = `
+      <div class="meta-info">
+        <span>${timeStr}</span>
+      </div>
+    `;
+
+    row.innerHTML = isMe ? metaHtml + contentHtml : contentHtml + metaHtml;
+    container.appendChild(row);
+  }
+
+  // 画像ファイル選択処理
+  function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // ※Firestoreの容量制限対策のため、画像サイズが大きい場合は簡易的にリサイズ推奨
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      selectedImageData = e.target.result;
+      document.getElementById('preview-img').src = selectedImageData;
+      document.getElementById('preview-bar').style.display = 'flex';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearImage() {
+    selectedImageData = null;
+    document.getElementById('file-input').value = '';
+    document.getElementById('preview-bar').style.display = 'none';
+  }
+
+  function toggleStampPicker() {
+    const picker = document.getElementById('stamp-picker');
+    picker.style.display = picker.style.display === 'grid' ? 'none' : 'grid';
+  }
+
+  function handleKeyPress(event) {
+    if (event.key === 'Enter') sendMessage();
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>"']/g, function(m) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+    });
+  }
+</script>
+
+</body>
+</html>
