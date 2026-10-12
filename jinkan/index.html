@@ -1,392 +1,335 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>スマホ専用 人感AIセンサー</title>
-  
-  <!-- MediaPipe Face Detection CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/face_detection.js" crossorigin="anonymous"></script>
-
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      user-select: none;
-      -webkit-user-select: none;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    }
-
-    body {
-      background-color: #0b0f19;
-      color: #ffffff;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    /* 上部ステータスバー */
-    .header-status {
-      padding: 16px;
-      text-align: center;
-      background: rgba(15, 23, 42, 0.9);
-      border-bottom: 2px solid #1e293b;
-      transition: all 0.3s ease;
-      z-index: 10;
-    }
-
-    .header-status.detected {
-      background: rgba(220, 38, 38, 0.2);
-      border-bottom-color: #ef4444;
-    }
-
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 1.1rem;
-      font-weight: bold;
-      letter-spacing: 0.05em;
-      padding: 6px 16px;
-      border-radius: 20px;
-      background: rgba(255, 255, 255, 0.05);
-    }
-
-    .dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background-color: #10b981;
-      box-shadow: 0 0 10px #10b981;
-      animation: pulse 1.5s infinite;
-    }
-
-    .header-status.detected .dot {
-      background-color: #ef4444;
-      box-shadow: 0 0 12px #ef4444;
-    }
-
-    @keyframes pulse {
-      0% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.85); }
-      100% { opacity: 1; transform: scale(1); }
-    }
-
-    /* カメラビューポート */
-    .camera-container {
-      flex: 1;
-      position: relative;
-      width: 100%;
-      background: #000;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      overflow: hidden;
-    }
-
-    video {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      transform: scaleX(-1); /* インカメラ用反転 */
-    }
-
-    canvas {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      z-index: 2;
-    }
-
-    /* スキャン波紋エフェクト */
-    .scan-line {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 4px;
-      background: linear-gradient(90deg, transparent, #06b6d4, transparent);
-      box-shadow: 0 0 15px #06b6d4;
-      z-index: 3;
-      animation: scan 2.5s linear infinite;
-      pointer-events: none;
-    }
-
-    @keyframes scan {
-      0% { top: 0%; opacity: 0.8; }
-      50% { opacity: 1; }
-      100% { top: 100%; opacity: 0.8; }
-    }
-
-    /* 下部メイン情報パネル */
-    .bottom-panel {
-      padding: 20px 16px;
-      background: rgba(15, 23, 42, 0.95);
-      border-top: 1px solid #1e293b;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      z-index: 10;
-    }
-
-    .count-display {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: rgba(255, 255, 255, 0.03);
-      padding: 12px 20px;
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    .count-label {
-      font-size: 0.9rem;
-      color: #94a3b8;
-    }
-
-    .count-value {
-      font-size: 2rem;
-      font-weight: 800;
-      color: #38bdf8;
-    }
-
-    /* 操作ボタン */
-    .controls {
-      display: flex;
-      gap: 12px;
-    }
-
-    .btn {
-      flex: 1;
-      padding: 14px;
-      border: none;
-      border-radius: 12px;
-      font-size: 0.95rem;
-      font-weight: bold;
-      color: #fff;
-      background: #1e293b;
-      border: 1px solid #334155;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    .btn:active {
-      background: #334155;
-    }
-
-    /* 人検出通知オーバーレイ */
-    .detected-overlay {
-      position: absolute;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(239, 68, 68, 0.9);
-      color: white;
-      padding: 8px 20px;
-      border-radius: 20px;
-      font-weight: bold;
-      font-size: 0.9rem;
-      box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
-      z-index: 4;
-      display: none;
-    }
-  </style>
-</head>
-<body>
-
-  <!-- ステータスヘッダー -->
-  <div class="header-status" id="headerStatus">
-    <div class="status-badge">
-      <div class="dot"></div>
-      <span id="statusText">人を探索中...</span>
-    </div>
-  </div>
-
-  <!-- カメラビュー -->
-  <div class="camera-container">
-    <video id="webcam" playsinline autoplay muted></video>
-    <canvas id="outputCanvas"></canvas>
-    <div class="scan-line"></div>
-    <div class="detected-overlay" id="detectedOverlay">⚠️ 人感を検知しました</div>
-  </div>
-
-  <!-- 下部コントロールパネル -->
-  <div class="bottom-panel">
-    <div class="count-display">
-      <span class="count-label">検知人数</span>
-      <span class="count-value" id="peopleCount">0 人</span>
-    </div>
-
-    <div class="controls">
-      <button class="btn" id="toggleCameraBtn">
-        🔄 カメラ切替
-      </button>
-      <button class="btn" id="toggleSoundBtn">
-        🔊 効果音: ON
-      </button>
-    </div>
-  </div>
-
-  <script>
-    const videoElement = document.getElementById('webcam');
-    const canvasElement = document.getElementById('outputCanvas');
-    const canvasCtx = canvasElement.getContext('2d');
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Multi-Person AI Thermal Scanner</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Orbitron -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     
-    const headerStatus = document.getElementById('headerStatus');
-    const statusText = document.getElementById('statusText');
-    const peopleCountEl = document.getElementById('peopleCount');
-    const detectedOverlay = document.getElementById('detectedOverlay');
-    const toggleCameraBtn = document.getElementById('toggleCameraBtn');
-    const toggleSoundBtn = document.getElementById('toggleSoundBtn');
+    <!-- MediaPipe Face Detection -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/face_detection.js" crossorigin="anonymous"></script>
 
-    let facingMode = 'user'; // 'user' (インカメ) または 'environment' (アウトカメ)
-    let cameraInstance = null;
-    let soundEnabled = true;
-    let lastDetectedCount = 0;
+    <style>
+        body {
+            background-color: #030712;
+            color: #00f0ff;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
 
-    // 簡易ビープ音再生用のWeb Audio API
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    function playBeep() {
-      if (!soundEnabled) return;
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-      }
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5ノート
-      gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.2);
-    }
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
 
-    // MediaPipe Face Detection のセットアップ
-    const faceDetection = new FaceDetection({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`
-    });
+        .glass-panel {
+            background: rgba(10, 15, 30, 0.85);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+        }
 
-    faceDetection.setOptions({
-      model: 'short', // 近距離〜中距離用軽量モデル
-      minDetectionConfidence: 0.5
-    });
+        .scanlines::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.4) 50%);
+            z-index: 10;
+            background-size: 100% 3px;
+            pointer-events: none;
+        }
 
-    faceDetection.onResults(onResults);
+        @keyframes laserScan {
+            0% { top: 0%; opacity: 0.8; }
+            50% { opacity: 1; }
+            100% { top: 100%; opacity: 0.8; }
+        }
+        .laser-bar {
+            position: absolute;
+            left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #00f0ff, #ef4444, transparent);
+            box-shadow: 0 0 10px #00f0ff;
+            animation: laserScan 3s linear infinite;
+            pointer-events: none;
+            z-index: 11;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-between select-none">
 
-    // 人判定時のメイン処理
-    function onResults(results) {
-      // キャンバスサイズの調整
-      canvasElement.width = videoElement.videoWidth;
-      canvasElement.height = videoElement.videoHeight;
+    <!-- Top Header Bar -->
+    <header class="w-full glass-panel p-3 flex justify-between items-center z-20 border-b border-cyber-neon/30">
+        <div class="flex items-center space-x-2">
+            <div class="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-400 flex items-center justify-center text-cyan-400">
+                <i class="fa-solid fa-temperature-arrow-up text-sm"></i>
+            </div>
+            <div>
+                <h1 class="font-orbitron font-extrabold text-sm text-cyan-400 tracking-wider">
+                    THERMO-SCANNER <span class="text-[9px] bg-cyan-950 border border-cyan-500/40 text-cyan-300 px-1.5 py-0.5 rounded">MULTI-AI</span>
+                </h1>
+                <p class="text-[10px] text-gray-400">複数人自動体温・属性トラッキング</p>
+            </div>
+        </div>
 
-      canvasCtx.save();
-      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        <!-- Detected Status Counters -->
+        <div class="flex items-center space-x-2 font-orbitron text-xs">
+            <div class="bg-slate-900/90 px-2.5 py-1 rounded border border-cyan-500/40">
+                <span class="text-gray-400 text-[10px]">DETECTED:</span>
+                <span id="people-count" class="text-cyan-400 font-bold text-sm ml-1">0</span>
+            </div>
+        </div>
+    </header>
 
-      const detections = results.detections || [];
-      const currentCount = detections.length;
+    <!-- Main Camera Viewport -->
+    <main class="flex-grow relative w-full h-full bg-black overflow-hidden flex items-center justify-center scanlines">
+        
+        <!-- Laser Scanning Overlay -->
+        <div class="laser-bar"></div>
 
-      // 新しく人が検出された場合にビープ音
-      if (currentCount > 0 && lastDetectedCount === 0) {
-        playBeep();
-      }
-      lastDetectedCount = currentCount;
+        <!-- Raw Video (Hidden processing source) -->
+        <video id="webcam" playsinline autoplay muted class="hidden"></video>
 
-      // UI表示の更新
-      peopleCountEl.textContent = `${currentCount} 人`;
+        <!-- Canvas for Thermal Rendering & HUD Overlay -->
+        <canvas id="output-canvas" class="w-full h-full object-cover relative z-10"></canvas>
 
-      if (currentCount > 0) {
-        // 【検知時】
-        headerStatus.classList.add('detected');
-        statusText.textContent = '人を検知しました！';
-        detectedOverlay.style.display = 'block';
+        <!-- Thermal Scale Indicator Bar (Right side) -->
+        <div class="absolute right-3 top-1/2 -translate-y-1/2 z-20 flex flex-col items-center space-y-1 glass-panel p-1.5 rounded-lg border border-cyan-500/30">
+            <span class="text-[9px] font-orbitron text-red-400 font-bold">38°C</span>
+            <div class="w-2.5 h-32 rounded bg-gradient-to-t from-blue-600 via-green-400 via-yellow-400 to-red-500 border border-slate-700"></div>
+            <span class="text-[9px] font-orbitron text-blue-400 font-bold">34°C</span>
+        </div>
 
-        // 検出枠と推定属性（ざっくり判定）の描画
-        detections.forEach((detection, index) => {
-          const bbox = detection.boundingBox;
-          const x = bbox.xCenter * canvasElement.width - (bbox.width * canvasElement.width) / 2;
-          const y = bbox.yCenter * canvasElement.height - (bbox.height * canvasElement.height) / 2;
-          const w = bbox.width * canvasElement.width;
-          const h = bbox.height * canvasElement.height;
+        <!-- Standby Overlay -->
+        <div id="start-overlay" class="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-950/90 p-6 text-center backdrop-blur-sm">
+            <div class="w-16 h-16 rounded-full border border-cyan-400/50 flex items-center justify-center text-cyan-400 text-2xl mb-4 bg-cyan-500/10 animate-pulse">
+                <i class="fa-solid fa-users-viewfinder"></i>
+            </div>
+            <h2 class="font-orbitron font-bold text-lg text-white mb-2">複数人サーモグラフィースキャナー</h2>
+            <p class="text-xs text-gray-400 max-w-xs mb-6">離れた場所（引きの画角）からでも画面内の全員を自動で識別し、体温と属性を疑似解析表示します。</p>
+            <button id="start-btn" class="bg-cyan-500 hover:bg-cyan-400 text-black font-orbitron font-extrabold px-6 py-3 rounded-xl text-sm transition shadow-[0_0_15px_rgba(0,240,255,0.4)]">
+                <i class="fa-solid fa-power-off mr-2"></i>スキャナー起動
+            </button>
+        </div>
+    </main>
 
-          // インカメラ撮影時の左右反転補正
-          const drawX = facingMode === 'user' ? canvasElement.width - x - w : x;
+    <!-- Bottom Controls Footer -->
+    <footer class="w-full glass-panel p-3 z-20 border-t border-cyan-500/30 flex justify-between items-center gap-2">
+        <button id="toggle-thermal-btn" class="flex-1 bg-slate-900 border border-cyan-500/50 text-cyan-400 font-orbitron text-xs font-semibold py-2.5 rounded-lg flex items-center justify-center gap-1.5 active:bg-cyan-950">
+            <i class="fa-solid fa-eye"></i><span id="thermal-btn-label">サーモモード: ON</span>
+        </button>
 
-          // 枠線（赤色ネオン）
-          canvasCtx.strokeStyle = '#ef4444';
-          canvasCtx.lineWidth = 4;
-          canvasCtx.shadowColor = '#ef4444';
-          canvasCtx.shadowBlur = 10;
-          canvasCtx.strokeRect(drawX, y, w, h);
+        <button id="switch-cam-btn" class="flex-1 bg-slate-900 border border-slate-700 text-gray-300 font-orbitron text-xs font-semibold py-2.5 rounded-lg flex items-center justify-center gap-1.5 active:bg-slate-800">
+            <i class="fa-solid fa-rotate"></i><span>カメラ切替</span>
+        </button>
+    </footer>
 
-          // 属性のダミー推定（顔位置の高さ・縦横比から概算）
-          const isAdult = h > canvasElement.height * 0.18 ? '大人' : '子供';
-          const genderType = (index % 2 === 0) ? '男性' : '女性'; // ※軽量モデルのためバリエーション表示
+    <script>
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('output-canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-          // タグラベル描画
-          const label = `👤 PERSON #${index + 1} (${genderType}・${isAdult})`;
-          canvasCtx.fillStyle = '#ef4444';
-          canvasCtx.font = 'bold 16px sans-serif';
-          const textWidth = canvasCtx.measureText(label).width;
+        const peopleCountEl = document.getElementById('people-count');
+        const startOverlay = document.getElementById('start-overlay');
+        const startBtn = document.getElementById('start-btn');
+        const toggleThermalBtn = document.getElementById('toggle-thermal-btn');
+        const thermalBtnLabel = document.getElementById('thermal-btn-label');
+        const switchCamBtn = document.getElementById('switch-cam-btn');
 
-          canvasCtx.fillRect(drawX, y - 30, textWidth + 16, 26);
-          canvasCtx.fillStyle = '#ffffff';
-          canvasCtx.fillText(label, drawX + 8, y - 12);
+        let cameraInstance = null;
+        let faceDetection = null;
+        let isThermalActive = true;
+        let facingMode = 'user'; // 'user' (インカメ) or 'environment' (アウトカメ)
+        let detectionsCache = [];
+
+        // Pre-generated pseudo-temperatures and attributes for tracking consistency
+        const personMetaMap = new Map();
+
+        // Thermal Lookup Table (LUT) for fast rendering
+        const thermalLUT = new Uint8ClampedArray(256 * 3);
+        for (let i = 0; i < 256; i++) {
+            const val = i / 255;
+            let r = 0, g = 0, b = 0;
+            if (val < 0.25) {
+                b = Math.floor(val * 4 * 255);
+            } else if (val < 0.5) {
+                g = Math.floor((val - 0.25) * 4 * 255);
+                b = Math.floor((0.5 - val) * 4 * 255);
+            } else if (val < 0.75) {
+                r = Math.floor((val - 0.5) * 4 * 255);
+                g = 255;
+            } else {
+                r = 255;
+                g = Math.floor((1 - val) * 4 * 255);
+            }
+            thermalLUT[i * 3] = r;
+            thermalLUT[i * 3 + 1] = g;
+            thermalLUT[i * 3 + 2] = b;
+        }
+
+        function initFaceDetection() {
+            faceDetection = new FaceDetection({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`
+            });
+
+            faceDetection.setOptions({
+                model: 'short',
+                minDetectionConfidence: 0.45
+            });
+
+            faceDetection.onResults((results) => {
+                detectionsCache = results.detections || [];
+            });
+        }
+
+        function getPersonMeta(idIndex) {
+            if (!personMetaMap.has(idIndex)) {
+                const genders = ['男性', '女性'];
+                const ages = ['20代', '30代', '40代'];
+                // Generate base body temperature around 36.3°C - 36.8°C
+                const baseTemp = (36.3 + Math.random() * 0.5).toFixed(1);
+                const gender = genders[idIndex % genders.length];
+                const age = ages[(idIndex * 2) % ages.length];
+
+                personMetaMap.set(idIndex, {
+                    temp: baseTemp,
+                    gender: gender,
+                    age: age
+                });
+            }
+            return personMetaMap.get(idIndex);
+        }
+
+        function renderFrame() {
+            if (video.readyState >= 2) {
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 480;
+
+                const width = canvas.width;
+                const height = canvas.height;
+
+                // 1. Draw original video onto canvas
+                ctx.save();
+                if (facingMode === 'user') {
+                    ctx.translate(width, 0);
+                    ctx.scale(-1, 1);
+                }
+                ctx.drawImage(video, 0, 0, width, height);
+                ctx.restore();
+
+                // 2. Apply Thermal Color LUT Shader if active
+                if (isThermalActive) {
+                    const imageData = ctx.getImageData(0, 0, width, height);
+                    const data = imageData.data;
+                    const len = data.length;
+
+                    for (let i = 0; i < len; i += 4) {
+                        // Fast luminance calculation
+                        const lum = (data[i] * 299 + data[i + 1] * 587 + data[i + 2] * 114) >> 10;
+                        const lutIdx = lum * 3;
+                        data[i] = thermalLUT[lutIdx];
+                        data[i + 1] = thermalLUT[lutIdx + 1];
+                        data[i + 2] = thermalLUT[lutIdx + 2];
+                    }
+                    ctx.putImageData(imageData, 0, 0);
+                }
+
+                // 3. Render Multi-Person Bounding HUDs & Temperature Labels
+                const count = detectionsCache.length;
+                peopleCountEl.textContent = count;
+
+                detectionsCache.forEach((detection, idx) => {
+                    const bbox = detection.boundingBox;
+                    const x = bbox.xCenter * width - (bbox.width * width) / 2;
+                    const y = bbox.yCenter * height - (bbox.height * height) / 2;
+                    const w = bbox.width * width;
+                    const h = bbox.height * height;
+
+                    const drawX = facingMode === 'user' ? width - x - w : x;
+                    const meta = getPersonMeta(idx);
+
+                    // Expand bounding frame to fit full body / upper torso
+                    const framePadX = w * 0.3;
+                    const framePadY = h * 0.2;
+                    const boxX = Math.max(0, drawX - framePadX);
+                    const boxY = Math.max(0, y - framePadY);
+                    const boxW = Math.min(width - boxX, w + framePadX * 2);
+                    const boxH = Math.min(height - boxY, h + framePadY * 3);
+
+                    const isFever = parseFloat(meta.temp) >= 37.5;
+                    const strokeColor = isFever ? '#ef4444' : '#00f0ff';
+
+                    // Cyber Bounding Corner Frames
+                    ctx.strokeStyle = strokeColor;
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(boxX, boxY, boxW, boxH);
+
+                    // Temperature HUD Label Tag above person
+                    const tagY = Math.max(30, boxY - 10);
+                    const tagW = 165;
+                    const tagH = 26;
+
+                    ctx.fillStyle = 'rgba(3, 7, 18, 0.9)';
+                    ctx.fillRect(boxX, tagY - 24, tagW, tagH);
+                    ctx.strokeStyle = strokeColor;
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(boxX, tagY - 24, tagW, tagH);
+
+                    // Text Content
+                    ctx.fillStyle = strokeColor;
+                    ctx.font = 'bold 11px Orbitron, sans-serif';
+                    ctx.fillText(`P#${idx + 1} | ${meta.temp}°C | ${meta.gender}`, boxX + 6, tagY - 8);
+                });
+            }
+
+            requestAnimationFrame(renderFrame);
+        }
+
+        async function startCamera() {
+            if (!faceDetection) initFaceDetection();
+
+            if (cameraInstance) {
+                await cameraInstance.stop();
+            }
+
+            cameraInstance = new Camera(video, {
+                onFrame: async () => {
+                    if (video.readyState >= 2) {
+                        await faceDetection.send({ image: video });
+                    }
+                },
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                facingMode: facingMode
+            });
+
+            await cameraInstance.start();
+            startOverlay.classList.add('hidden');
+        }
+
+        // Toggle Thermal Color Shader
+        toggleThermalBtn.addEventListener('click', () => {
+            isThermalActive = !isThermalActive;
+            thermalBtnLabel.textContent = `サーモモード: ${isThermalActive ? 'ON' : 'OFF'}`;
+            toggleThermalBtn.classList.toggle('border-cyan-500/50', isThermalActive);
+            toggleThermalBtn.classList.toggle('border-slate-700', !isThermalActive);
         });
 
-      } else {
-        // 【未検知時】
-        headerStatus.classList.remove('detected');
-        statusText.textContent = '人を探索中...';
-        detectedOverlay.style.display = 'none';
-      }
+        // Switch Camera (Front / Rear)
+        switchCamBtn.addEventListener('click', async () => {
+            facingMode = (facingMode === 'user') ? 'environment' : 'user';
+            await startCamera();
+        });
 
-      canvasCtx.restore();
-    }
-
-    // カメラの起動・切替
-    function startCamera() {
-      if (cameraInstance) {
-        cameraInstance.stop();
-      }
-
-      cameraInstance = new Camera(videoElement, {
-        onFrame: async () => {
-          await faceDetection.send({ image: videoElement });
-        },
-        width: 1280,
-        height: 720,
-        facingMode: facingMode
-      });
-
-      cameraInstance.start();
-    }
-
-    // カメラ切り替えボタン
-    toggleCameraBtn.addEventListener('click', () => {
-      facingMode = (facingMode === 'user') ? 'environment' : 'user';
-      videoElement.style.transform = (facingMode === 'user') ? 'scaleX(-1)' : 'scaleX(1)';
-      startCamera();
-    });
-
-    // 音声トグルボタン
-    toggleSoundBtn.addEventListener('click', () => {
-      soundEnabled = !soundEnabled;
-      toggleSoundBtn.textContent = soundEnabled ? '🔊 効果音: ON' : '🔇 効果音: OFF';
-    });
-
-    // 初回起動
-    startCamera();
-  </script>
+        startBtn.addEventListener('click', startCamera);
+        requestAnimationFrame(renderFrame);
+    </script>
 </body>
 </html>
