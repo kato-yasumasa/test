@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>大富豪</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:inherit}
+html,body{margin:0;min-height:100%;touch-action:manipulation;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;background:#0b5d3b;color:#fff;font-family:system-ui,"Hiragino Sans","Noto Sans JP",sans-serif}
+#app{max-width:760px;margin:0 auto;padding:10px;display:flex;flex-direction:column;gap:12px;min-height:100vh;min-height:100dvh}
+h1{text-align:center;margin:8px 0;font-size:24px}
+.players{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.pl{background:rgba(0,0,0,.28);border-radius:10px;padding:6px;text-align:center;font-size:12px;border:2px solid transparent}
+.pl.turn{border-color:#ffd54a;background:rgba(255,213,74,.2)}
+.pl.out{opacity:.55}
+.pl b{display:block;font-size:13px}
+.table{flex:1;min-height:150px;background:rgba(0,0,0,.2);border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:10px}
+.row{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+.msg{font-size:14px;min-height:20px;text-align:center}
+.badge{background:#c62828;border-radius:8px;padding:2px 8px;font-size:12px}
+.card{width:46px;height:66px;background:#fff;color:#222;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:700;font-size:17px;line-height:1.1;box-shadow:0 2px 4px rgba(0,0,0,.4);flex:none;user-select:none}
+.card.red{color:#d32f2f}
+.card.back{background:repeating-linear-gradient(45deg,#1a4d9c,#1a4d9c 5px,#2b66c4 5px,#2b66c4 10px);border:2px solid #fff}
+.hand{display:flex;flex-wrap:wrap;justify-content:center;padding:18px 4px 4px;min-height:100px}
+.hand .card{width:clamp(34px,10.5vw,46px);height:clamp(50px,15vw,66px);margin:0 -3px 6px;cursor:pointer;transition:transform .1s}
+@media(max-width:480px){.card{font-size:14px}.pl{font-size:11px;padding:4px 2px}.pl b{font-size:12px}button{padding:14px 28px;font-size:16px}#app{padding:8px}}
+.hand .card.sel{transform:translateY(-14px);box-shadow:0 0 0 3px #ffd54a}
+.btns{display:flex;gap:10px;justify-content:center;position:sticky;bottom:0;padding:8px 0;background:linear-gradient(transparent,#0b5d3b 35%)}
+button{font:inherit;font-weight:700;border:0;border-radius:10px;padding:12px 26px;background:#ffd54a;color:#222;cursor:pointer}
+button.sub{background:#cfd8dc}
+button:disabled{opacity:.4;cursor:default}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;text-align:center;padding:20px;z-index:5}
+.ov h2{margin:0}
+.res{font-size:18px;line-height:1.9}
+.help{font-size:12px;opacity:.8;text-align:center}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const SU=['♠','♥','♦','♣','🃏'],RN={11:'J',12:'Q',13:'K',14:'A',15:'2',16:'JK'};
+const TITLES=['大富豪','富豪','貧民','大貧民'];
+let N=1,hands=[],field=[],fieldR=0,lock='',prevSig='',last=-1,passed=new Set,finished=[],turn=0,rev=false,sel=new Set,viewer=0,cover=false,msg='',started=false,over=false;
+const $=document.getElementById('app');
+const str=r=>r===16?99:rev?18-r:r;
+const effR=cs=>{const n=cs.find(c=>c.r!==16);return n?n.r:16};
+const name=i=>N===1&&i===0?'あなた':i<N?'プレイヤー'+(i+1):'CPU'+(i-N+1);
+const lab=r=>r<=10?r:RN[r];
+const cardH=c=>`<div class="card ${c.s%3&&c.s!==3?'red':''}">`; // placeholder
+function cardEl(c,extra='',i=''){const red=c.s===1||c.s===2;return `<div class="card ${red?'red':''} ${extra}" ${i!==''?`onclick="tog(${i})"`:''}><span>${SU[c.s]}</span><span>${lab(c.r)}</span></div>`}
+function sortHands(){hands.forEach(h=>h.sort((a,b)=>str(a.r)-str(b.r)||a.s-b.s))}
+function title(){
+  $.innerHTML=`<h1>🃏 大富豪</h1><div class="table"><div>プレイ人数(人間)を選んでください</div>
+  <div class="row">${[1,2,3,4].map(n=>`<button onclick="start(${n})">${n}人</button>`).join('')}</div>
+  <div class="help">残りの席はCPUが担当します。<br>ルール: 8切り・革命(4枚出し)・縛り・ジョーカー2枚(ワイルド/単体は最強) / 2が最強、3が最弱</div></div>`;
+}
+function start(n){
+  N=n;const d=[];for(let s=0;s<4;s++)for(let r=3;r<=15;r++)d.push({s,r});d.push({s:4,r:16},{s:4,r:16});
+  for(let i=d.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[d[i],d[j]]=[d[j],d[i]]}
+  const st=[0,14,28,41,54];hands=[0,1,2,3].map(i=>d.slice(st[i],st[i+1]));
+  field=[];fieldR=0;lock='';prevSig='';last=-1;passed=new Set;finished=[];rev=false;sel=new Set;over=false;started=true;
+  turn=hands.findIndex(h=>h.some(c=>c.s===2&&c.r===3));
+  viewer=turn<N?turn:0;msg='ゲーム開始! ♦3を持つ '+name(turn)+' から';
+  sortHands();step();
+}
+function nextActive(from){let i=from;do{i=(i+1)%4}while(finished.includes(i)||passed.has(i));return i}
+function valid(cards){
+  if(!cards.length)return false;
+  const nj=cards.filter(c=>c.r!==16);
+  if(nj.some(c=>c.r!==nj[0].r))return false;
+  if(lock&&nj.some(c=>!lock.includes(c.s)))return false;
+  if(field.length)return cards.length===field.length&&str(effR(cards))>str(fieldR);
+  return true;
+}
+function play(p,cards){
+  hands[p]=hands[p].filter(c=>!cards.includes(c));
+  const sig=cards.filter(c=>c.r!==16).map(c=>c.s).sort().join('');
+  let lm='';if(field.length&&!lock&&sig&&sig===prevSig){lock=sig;lm=' 【縛り!'+[...sig].map(s=>SU[s]).join('')+'】'}
+  prevSig=sig;field=cards;fieldR=effR(cards);last=p;passed.clear();sel.clear();
+  let m=name(p)+' が '+cards.map(c=>SU[c.s]+lab(c.r)).join(' ')+' を出した';
+  m+=lm;
+  if(cards.length===4){rev=!rev;sortHands();m+=' 【革命!】'}
+  if(!hands[p].length){finished.push(p);m+=' → あがり! ('+TITLES[finished.length-1]+')'}
+  const active=[0,1,2,3].filter(i=>!finished.includes(i));
+  if(active.length<=1){if(active.length)finished.push(active[0]);msg=m;over=true;render();return}
+  if(effR(cards)===8){m+=' 【8切り!】';field=[];lock='';prevSig='';msg=m;turn=finished.includes(p)?nextActive(p):p;return step()}
+  msg=m;advance();
+}
+function pass(p){passed.add(p);msg=name(p)+' はパス';advance()}
+function advance(){
+  const active=[0,1,2,3].filter(i=>!finished.includes(i));
+  const others=active.filter(i=>i!==last);
+  if(field.length&&others.every(i=>passed.has(i))){
+    field=[];lock='';prevSig='';passed.clear();msg+=' / 場が流れた';
+    turn=finished.includes(last)?nextActive(last):last;
+  }else turn=nextActive(turn);
+  step();
+}
+function step(){
+  sel.clear();
+  if(turn<N){viewer=turn;cover=N>1}
+  render();
+  if(turn>=N)setTimeout(cpu,900);
+}
+function cpu(){
+  const p=turn,h=hands[p],g={};
+  const jk=h.filter(c=>c.r===16);h.filter(c=>c.r!==16).forEach(c=>(g[c.r]=g[c.r]||[]).push(c));
+  let cands=[];
+  for(const r in g){
+    if(field.length){
+      const n=field.length;
+      if(str(+r)>str(fieldR)){
+        if(g[r].length>=n){const cs=g[r].slice(0,n);if(valid(cs))cands.push(cs)}
+        else if(g[r].length+jk.length>=n){const cs=g[r].concat(jk).slice(0,n);if(valid(cs))cands.push(cs)}
+      }
+    }else cands.push(g[r]);
+  }
+  if(field.length&&jk.length>=field.length){const cs=jk.slice(0,field.length);if(valid(cs))cands.push(cs)}
+  if(!field.length&&!cands.length&&jk.length)cands.push(jk);
+  const score=c=>c.some(x=>x.r===16)?(c.every(x=>x.r===16)?50:30):str(c[0].r)+(c[0].r===8&&h.length>2?20:0);
+  cands.sort((a,b)=>score(a)-score(b));
+  if(!cands.length)return pass(p);
+  const best=cands[0];
+  if(field.length&&score(best)>=13&&h.length>4&&Math.random()<(score(best)>=30?.7:.4))return pass(p);
+  play(p,best);
+}
+function tog(i){if(turn>=N||cover)return;sel.has(i)?sel.delete(i):sel.add(i);render()}
+function doPlay(){const cs=[...sel].map(i=>hands[turn][i]);if(valid(cs)){cover=N>1;play(turn,cs)}}
+function doPass(){if(!field.length)return;const p=turn;cover=N>1;pass(p)}
+function reveal(){cover=false;render()}
+function render(){
+  if(!started)return title();
+  const human=turn<N&&!cover&&!over;
+  const hide=N>1&&cover;
+  const cs=[...sel].map(i=>hands[viewer][i]);
+  const ok=human&&valid(cs);
+  let h=`<h1>🃏 大富豪</h1><div class="players">`+[0,1,2,3].map(i=>{
+    const f=finished.indexOf(i);
+    return `<div class="pl ${i===turn&&!over?'turn':''} ${f>=0?'out':''}"><b>${name(i)}</b>${f>=0?TITLES[f]:hands[i].length+'枚'}${passed.has(i)?'<br>(パス)':''}</div>`}).join('')+`</div>`;
+  h+=`<div class="table">${rev?'<span class="badge">革命中(強弱逆転)</span>':''}${lock?'<span class="badge" style="background:#1565c0">縛り: '+[...lock].map(s=>SU[s]).join('')+'</span>':''}
+  <div class="row">${field.length?field.map(c=>cardEl(c)).join(''):'<span style="opacity:.6">場にカードなし</span>'}</div>
+  <div class="msg">${msg}</div></div>`;
+  h+=`<div class="msg">${over?'':(turn<N?name(turn)+' の番です':name(turn)+' が考え中…')}</div>`;
+  h+=`<div class="hand">${hands[viewer].map((c,i)=>hide?'<div class="card back"></div>':cardEl(c,sel.has(i)?'sel':'',i)).join('')}</div>`;
+  h+=`<div class="btns"><button ${ok?'':'disabled'} onclick="doPlay()">出す</button><button class="sub" ${human&&field.length?'':'disabled'} onclick="doPass()">パス</button></div>`;
+  if(N>1&&turn<N&&cover&&!over)h+=`<div class="ov"><h2>${name(turn)} の番です</h2><div>他の人は画面を見ないでください</div><button onclick="reveal()">手札を見る</button></div>`;
+  if(over)h+=`<div class="ov"><h2>結果発表</h2><div class="res">${finished.map((p,i)=>`${TITLES[i]}: ${name(p)}`).join('<br>')}</div><button onclick="start(N)">もう一度</button><button class="sub" onclick="started=false;render()">人数を選び直す</button></div>`;
+  $.innerHTML=h;
+}
+render();
+</script>
+</body>
+</html>
