@@ -7,7 +7,7 @@
 <style>
 :root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 *{box-sizing:inherit}
-html,body{margin:0;min-height:100%;touch-action:manipulation;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;background:#0b5d3b;color:#fff;font-family:system-ui,"Hiragino Sans","Noto Sans JP",sans-serif}
+html,body{margin:0;min-height:100%;touch-action:manipulation;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;background:#1b1230;color:#fff;font-family:system-ui,"Hiragino Sans","Noto Sans JP",sans-serif}
 #app{max-width:760px;margin:0 auto;padding:10px;display:flex;flex-direction:column;gap:12px;min-height:100vh;min-height:100dvh}
 h1{text-align:center;margin:8px 0;font-size:24px}
 .players{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
@@ -18,6 +18,24 @@ h1{text-align:center;margin:8px 0;font-size:24px}
 .table{flex:1;min-height:150px;background:rgba(0,0,0,.2);border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:10px}
 .row{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
 .msg{font-size:14px;min-height:20px;text-align:center;white-space:pre-line}
+.stage{position:relative;height:clamp(300px,78vw,400px);border-radius:16px;overflow:hidden;background:linear-gradient(#3a2a63 0,#2a1d4d 36%,#5a3d28 36%,#3b2718 100%);box-shadow:inset 0 0 40px rgba(0,0,0,.5)}
+.tbl{position:absolute;left:9%;right:9%;top:24%;bottom:14%;border-radius:50%;background:radial-gradient(ellipse at 50% 40%,#2aa56f,#0e6b43 70%);border:7px solid #7a5230;box-shadow:0 20px 24px rgba(0,0,0,.55),inset 0 0 40px rgba(0,0,0,.4)}
+.fld{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:4px;width:52%}
+.fld .row{gap:2px}
+.fld .card{width:34px;height:49px;font-size:13px}
+.seat{position:absolute;display:flex;flex-direction:column;align-items:center;width:84px;text-align:center}
+.s2{left:50%;top:1%;transform:translateX(-50%) scale(.78)}
+.s1{left:1%;top:34%;transform:scale(.92)}
+.s3{right:1%;top:34%;transform:scale(.92)}
+.s0{left:50%;bottom:0;transform:translateX(-50%) scale(1.05)}
+.nm{background:rgba(0,0,0,.65);padding:2px 8px;border-radius:10px;font-size:12px;font-weight:700;white-space:nowrap;margin-bottom:2px}
+.face{width:48px;height:48px;border-radius:50%;background:#ffe0b2;display:flex;align-items:center;justify-content:center;font-size:30px;box-shadow:0 2px 4px rgba(0,0,0,.5)}
+.bd{width:60px;height:22px;border-radius:30px 30px 6px 6px;margin-top:-6px;box-shadow:0 3px 4px rgba(0,0,0,.4)}
+.info{font-size:11px;background:rgba(0,0,0,.5);border-radius:8px;padding:1px 7px;margin-top:2px;white-space:nowrap}
+.seat.turn .nm{background:#ffd54a;color:#222}
+.seat.turn .face{box-shadow:0 0 0 4px #ffd54a,0 0 16px #ffd54a;animation:bob 1s ease-in-out infinite}
+.seat.out{opacity:.55}
+@keyframes bob{50%{transform:translateY(-4px)}}
 .badge{background:#c62828;border-radius:8px;padding:2px 8px;font-size:12px}
 .card{width:46px;height:66px;background:#fff;color:#222;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:700;font-size:17px;line-height:1.1;box-shadow:0 2px 4px rgba(0,0,0,.4);flex:none;user-select:none}
 .card.red{color:#d32f2f}
@@ -26,7 +44,7 @@ h1{text-align:center;margin:8px 0;font-size:24px}
 .hand .card{width:clamp(34px,10.5vw,46px);height:clamp(50px,15vw,66px);margin:0 -3px 6px;cursor:pointer;transition:transform .1s}
 @media(max-width:480px){.card{font-size:14px}.pl{font-size:11px;padding:4px 2px}.pl b{font-size:12px}button{padding:14px 28px;font-size:16px}#app{padding:8px}}
 .hand .card.sel{transform:translateY(-14px);box-shadow:0 0 0 3px #ffd54a}
-.btns{display:flex;gap:10px;justify-content:center;position:sticky;bottom:0;padding:8px 0;background:linear-gradient(transparent,#0b5d3b 35%)}
+.btns{display:flex;gap:10px;justify-content:center;position:sticky;bottom:0;padding:8px 0;background:linear-gradient(transparent,#1b1230 35%)}
 button{font:inherit;font-weight:700;border:0;border-radius:10px;padding:12px 26px;background:#ffd54a;color:#222;cursor:pointer}
 button.sub{background:#cfd8dc}
 button:disabled{opacity:.4;cursor:default}
@@ -173,12 +191,14 @@ function render(){
   const hide=N>1&&cover;
   const cs=[...sel].map(i=>hands[viewer][i]);
   const ok=human&&(xch?cs.length===xch.n:valid(cs));
-  let h=`<h1>🃏 大富豪</h1><div class="players">`+[0,1,2,3].map(i=>{
+  let h=`<h1>🃏 大富豪</h1><div class="stage"><div class="tbl"></div>`+[0,1,2,3].map(i=>{
     const f=finished.indexOf(i);
-    return `<div class="pl ${i===turn&&!over?'turn':''} ${f>=0?'out':''}"><b>${name(i)}</b>${i===dropped?'都落ち':f>=0?TITLES[f]:hands[i].length+'枚'}${passed.has(i)?'<br>(パス)':''}</div>`}).join('')+`</div>`;
-  h+=`<div class="table">${rev?'<span class="badge">革命中(強弱逆転)</span>':''}${lock?'<span class="badge" style="background:#1565c0">縛り: '+[...lock].map(s=>SU[s]).join('')+'</span>':''}
+    const av=i<N?['😎','😄','🙂','😆'][i]:['🤖','🦊','🐱','🐻'][i],col=['#e53935','#1e88e5','#8e24aa','#fb8c00'][i];
+    const stt=i===dropped?'都落ち':f>=0?(f===0?'👑':'')+TITLES[f]:hands[i].length+'枚';
+    return `<div class="seat s${i} ${i===turn&&!over?'turn':''} ${f>=0?'out':''}"><div class="nm">${name(i)}</div><div class="face">${av}</div><div class="bd" style="background:${col}"></div><div class="info">${stt}${passed.has(i)?' ・パス':''}</div></div>`}).join('')+`<div class="fld">`;
+  h+=`${rev?'<span class="badge">革命中(強弱逆転)</span>':''}${lock?'<span class="badge" style="background:#1565c0">縛り: '+[...lock].map(s=>SU[s]).join('')+'</span>':''}
   <div class="row">${field.length&&fieldT==='s'?'<span class="badge" style="background:#6a1b9a">階段</span>':''}${field.length?field.map(c=>cardEl(c)).join(''):'<span style="opacity:.6">場にカードなし</span>'}</div>
-  <div class="msg">${msg}</div></div>`;
+  </div></div><div class="msg">${msg}</div>`;
   h+=`<div class="msg">${over?'':xch?name(turn)+' : '+name(xch.to)+'に渡すカードを'+xch.n+'枚選んでください':(turn<N?name(turn)+' の番です':name(turn)+' が考え中…')}</div>`;
   h+=`<div class="hand">${hands[viewer].map((c,i)=>hide?'<div class="card back"></div>':cardEl(c,sel.has(i)?'sel':'',i)).join('')}</div>`;
   h+=`<div class="btns"><button ${ok?'':'disabled'} onclick="${xch?'doX()':'doPlay()'}">${xch?'渡す':'出す'}</button><button class="sub" ${human&&field.length?'':'disabled'} onclick="doPass()">パス</button><button class="sub" style="background:#90a4ae" onclick="askQuit()">中断</button></div>`;
