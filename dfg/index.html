@@ -20,9 +20,9 @@ h1{text-align:center;margin:8px 0;font-size:24px}
 .msg{font-size:14px;min-height:20px;text-align:center;white-space:pre-line}
 .stage{position:relative;height:clamp(300px,78vw,400px);border-radius:16px;overflow:hidden;background:linear-gradient(#3a2a63 0,#2a1d4d 36%,#5a3d28 36%,#3b2718 100%);box-shadow:inset 0 0 40px rgba(0,0,0,.5)}
 .tbl{position:absolute;left:9%;right:9%;top:24%;bottom:14%;border-radius:50%;background:radial-gradient(ellipse at 50% 40%,#2aa56f,#0e6b43 70%);border:7px solid #7a5230;box-shadow:0 20px 24px rgba(0,0,0,.55),inset 0 0 40px rgba(0,0,0,.4)}
-.fld{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:4px;width:52%}
+.fld{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:4px;width:56%}
 .fld .row{gap:2px}
-.fld .card{width:34px;height:49px;font-size:13px}
+.fld .card{width:clamp(34px,10.5vw,46px);height:clamp(50px,15vw,66px)}
 .seat{position:absolute;display:flex;flex-direction:column;align-items:center;width:84px;text-align:center}
 .s2{left:50%;top:1%;transform:translateX(-50%) scale(.78)}
 .s1{left:1%;top:34%;transform:scale(.92)}
@@ -36,6 +36,10 @@ h1{text-align:center;margin:8px 0;font-size:24px}
 .seat.turn .face{box-shadow:0 0 0 4px #ffd54a,0 0 16px #ffd54a;animation:bob 1s ease-in-out infinite}
 .seat.out{opacity:.55}
 @keyframes bob{50%{transform:translateY(-4px)}}
+.old{position:absolute;left:50%;top:50%;z-index:0;pointer-events:none;width:100%}
+.old .row{gap:2px}
+.fld .badge{position:relative;z-index:2}
+.bdg{position:absolute;top:50%;left:50%;transform:translate(-50%,calc(-50% - clamp(40px,11.5vw,48px)));display:flex;gap:4px;white-space:nowrap;z-index:2}
 .badge{background:#c62828;border-radius:8px;padding:2px 8px;font-size:12px}
 .card{width:46px;height:66px;background:#fff;color:#222;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:700;font-size:17px;line-height:1.1;box-shadow:0 2px 4px rgba(0,0,0,.4);flex:none;user-select:none}
 .card.red{color:#d32f2f}
@@ -63,7 +67,7 @@ button:disabled{opacity:.4;cursor:default}
 const SU=['♠','♥','♦','♣','🃏'],RN={11:'J',12:'Q',13:'K',14:'A',15:'2',16:'JK'};
 const RULES=[['eight','8切り'],['joker','ジョーカー(2枚・ワイルド)'],['rev','革命(4枚出し)'],['lock','縛り'],['swap','カード交換'],['seq','階段(同スート3枚以上の連番)'],['fall','都落ち']];
 const TITLES=['大富豪','富豪','貧民','大貧民'];
-let opt={eight:1,joker:1,rev:1,lock:1,swap:1,seq:1,fall:1},fieldT='g',gid=0,tid=0,confirmQuit=false,prevRanks=null,prevTop=-1,dropped=-1,xq=[],xch=null,N=1,hands=[],field=[],fieldR=0,lock='',prevSig='',last=-1,passed=new Set,finished=[],turn=0,rev=false,sel=new Set,viewer=0,cover=false,msg='',started=false,over=false;
+let opt={eight:1,joker:1,rev:1,lock:1,swap:1,seq:1,fall:1},fieldT='g',flyFrom=-1,busy=false,pile=[],gid=0,tid=0,confirmQuit=false,prevRanks=null,prevTop=-1,dropped=-1,xq=[],xch=null,N=1,hands=[],field=[],fieldR=0,lock='',prevSig='',last=-1,passed=new Set,finished=[],turn=0,rev=false,sel=new Set,viewer=0,cover=false,msg='',started=false,over=false;
 const $=document.getElementById('app');
 const str=r=>r===16?99:rev?18-r:r;
 function info(cs){
@@ -89,11 +93,11 @@ function title(){
   <div class="row">${[1,2,3,4].map(n=>`<button onclick="start(${n})">${n}人</button>`).join('')}</div>
   <div class="help">残りの席はCPUが担当します。<br>2が最強、3が最弱<br>カード交換・都落ちは2ゲーム目以降に働きます</div></div>`;
 }
-function start(n,cont){gid++;confirmQuit=false;if(!cont){prevRanks=null;prevTop=-1}
+function start(n,cont){gid++;busy=false;confirmQuit=false;if(!cont){prevRanks=null;prevTop=-1}
   N=n;const d=[];for(let s=0;s<4;s++)for(let r=3;r<=15;r++)d.push({s,r});if(opt.joker)d.push({s:4,r:16},{s:4,r:16});
   for(let i=d.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[d[i],d[j]]=[d[j],d[i]]}
   const L=d.length,q=L>>2,e=L%4,st=[0,1,2,3,4].map(i=>i*q+Math.min(i,e));hands=[0,1,2,3].map(i=>d.slice(st[i],st[i+1]));
-  field=[];fieldR=0;lock='';prevSig='';last=-1;passed=new Set;finished=[];dropped=-1;fieldT='g';xch=null;xq=[];rev=false;sel=new Set;over=false;started=true;
+  field=[];fieldR=0;lock='';prevSig='';last=-1;passed=new Set;finished=[];dropped=-1;pile=[];fieldT='g';xch=null;xq=[];rev=false;sel=new Set;over=false;started=true;
   if(opt.swap&&prevRanks){sortHands();const f=prevRanks;xq=[{w:f[0],l:f[3],n:2},{w:f[1],l:f[2],n:1}];msg='';return runX()}
   turn=hands.findIndex(h=>h.some(c=>c.s===2&&c.r===3));
   viewer=turn<N?turn:0;msg='ゲーム開始! ♦3を持つ '+name(turn)+' から';
@@ -112,7 +116,7 @@ function play(p,cards){
   hands[p]=hands[p].filter(c=>!cards.includes(c));
   const I=info(cards),sig=cards.filter(c=>c.r!==16).map(c=>c.s).sort().join('');
   let lm='';if(opt.lock&&field.length&&!lock&&sig&&sig===prevSig&&(I.t==='g'||new Set(sig).size===1)){lock=sig;lm=' 【縛り!'+[...sig].map(s=>SU[s]).join('')+'】'}
-  prevSig=sig;field=cards;fieldR=I.r;fieldT=I.t;last=p;passed.clear();sel.clear();
+  if(field.length)pile.push(field);prevSig=sig;field=cards;fieldR=I.r;fieldT=I.t;last=p;flyFrom=p;passed.clear();sel.clear();
   let m=name(p)+' が '+cards.map(c=>SU[c.s]+lab(c.r)).join(' ')+' を出した';
   m+=lm;
   if(opt.rev&&I.t==='g'&&cards.length===4){rev=!rev;sortHands();m+=' 【革命!】'}
@@ -120,7 +124,7 @@ function play(p,cards){
     if(opt.fall&&finished.length===1&&prevTop>=0&&p!==prevTop){dropped=prevTop;finished.push(dropped);hands[dropped]=[];m+=' 【都落ち!】'+name(dropped)+' は大貧民に'}}
   const active=[0,1,2,3].filter(i=>!finished.includes(i));
   if(active.length<=1){if(active.length)finished.push(active[0]);finalize();msg=m;over=true;render();return}
-  if(opt.eight&&I.t==='g'&&I.r===8){m+=' 【8切り!】';field=[];lock='';prevSig='';msg=m;turn=finished.includes(p)?nextActive(p):p;return step()}
+  if(opt.eight&&I.t==='g'&&I.r===8){m+=' 【8切り!】';msg=m;busy=true;render();const g=gid;setTimeout(()=>{if(g!==gid)return;busy=false;field=[];pile=[];lock='';prevSig='';turn=finished.includes(p)?nextActive(p):p;step()},1000);return}
   msg=m;advance();
 }
 function pass(p){passed.add(p);msg=name(p)+' はパス';advance()}
@@ -128,7 +132,7 @@ function advance(){
   const active=[0,1,2,3].filter(i=>!finished.includes(i));
   const others=active.filter(i=>i!==last);
   if(field.length&&others.every(i=>passed.has(i))){
-    field=[];lock='';prevSig='';passed.clear();msg+=' / 場が流れた';
+    field=[];pile=[];lock='';prevSig='';passed.clear();msg+=' / 場が流れた';
     turn=finished.includes(last)?nextActive(last):last;
   }else turn=nextActive(turn);
   step();
@@ -139,6 +143,7 @@ function step(){
   render();
   sched();
 }
+function pileHtml(){const P=[[0,0,0],[0,0,0],[0,0,0]];return pile.slice(-3).map((cs,k,a)=>{const o=P[(pile.length-a.length+k)%3];return `<div class="old" style="transform:translate(calc(-50% + ${o[0]}px),calc(-50% + ${o[1]}px)) rotate(${o[2]}deg)"><div class="row">${cs.map(c=>cardEl(c)).join('')}</div></div>`}).join('')}
 function sched(){clearTimeout(tid);if(turn>=N&&!over&&!xch&&started){const g=gid;tid=setTimeout(()=>{if(g===gid&&!confirmQuit)cpu()},900)}}
 function askQuit(){clearTimeout(tid);confirmQuit=true;render()}
 function quitYes(){clearTimeout(tid);gid++;confirmQuit=false;started=false;render()}
@@ -181,13 +186,13 @@ function cpu(){
   if(field.length&&score(best)>=13&&h.length>4&&Math.random()<(score(best)>=30?.7:.4))return pass(p);
   play(p,best);
 }
-function tog(i){if(turn>=N||cover)return;sel.has(i)?sel.delete(i):sel.add(i);render()}
+function tog(i){if(turn>=N||cover||busy)return;sel.has(i)?sel.delete(i):sel.add(i);render()}
 function doPlay(){const cs=[...sel].map(i=>hands[turn][i]);if(valid(cs)){cover=N>1;play(turn,cs)}}
 function doPass(){if(!field.length)return;const p=turn;cover=N>1;pass(p)}
 function reveal(){cover=false;render()}
 function render(){
   if(!started)return title();
-  const human=turn<N&&!cover&&!over;
+  const human=turn<N&&!cover&&!over&&!busy;
   const hide=N>1&&cover;
   const cs=[...sel].map(i=>hands[viewer][i]);
   const ok=human&&(xch?cs.length===xch.n:valid(cs));
@@ -196,16 +201,17 @@ function render(){
     const av=i<N?['😎','😄','🙂','😆'][i]:['🤖','🦊','🐱','🐻'][i],col=['#e53935','#1e88e5','#8e24aa','#fb8c00'][i];
     const stt=i===dropped?'都落ち':f>=0?(f===0?'👑':'')+TITLES[f]:hands[i].length+'枚';
     return `<div class="seat s${i} ${i===turn&&!over?'turn':''} ${f>=0?'out':''}"><div class="nm">${name(i)}</div><div class="face">${av}</div><div class="bd" style="background:${col}"></div><div class="info">${stt}${passed.has(i)?' ・パス':''}</div></div>`}).join('')+`<div class="fld">`;
-  h+=`${rev?'<span class="badge">革命中(強弱逆転)</span>':''}${lock?'<span class="badge" style="background:#1565c0">縛り: '+[...lock].map(s=>SU[s]).join('')+'</span>':''}
-  <div class="row">${field.length&&fieldT==='s'?'<span class="badge" style="background:#6a1b9a">階段</span>':''}${field.length?field.map(c=>cardEl(c)).join(''):'<span style="opacity:.6">場にカードなし</span>'}</div>
+  h+=`${pileHtml()}<div class="bdg">${rev?'<span class="badge">革命中(強弱逆転)</span>':''}${lock?'<span class="badge" style="background:#1565c0">縛り: '+[...lock].map(s=>SU[s]).join('')+'</span>':''}
+  ${field.length&&fieldT==='s'?'<span class="badge" style="background:#6a1b9a">階段</span>':''}</div><div class="row cur" style="position:relative;z-index:1">${field.length?field.map(c=>cardEl(c)).join(''):'<span style="opacity:.6">場にカードなし</span>'}</div>
   </div></div><div class="msg">${msg}</div>`;
   h+=`<div class="msg">${over?'':xch?name(turn)+' : '+name(xch.to)+'に渡すカードを'+xch.n+'枚選んでください':(turn<N?name(turn)+' の番です':name(turn)+' が考え中…')}</div>`;
   h+=`<div class="hand">${hands[viewer].map((c,i)=>hide?'<div class="card back"></div>':cardEl(c,sel.has(i)?'sel':'',i)).join('')}</div>`;
   h+=`<div class="btns"><button ${ok?'':'disabled'} onclick="${xch?'doX()':'doPlay()'}">${xch?'渡す':'出す'}</button><button class="sub" ${human&&field.length?'':'disabled'} onclick="doPass()">パス</button><button class="sub" style="background:#90a4ae" onclick="askQuit()">中断</button></div>`;
-  if(N>1&&turn<N&&cover&&!over)h+=`<div class="ov"><h2>${name(turn)} の番です</h2><div>他の人は画面を見ないでください</div><button onclick="reveal()">手札を見る</button></div>`;
+  if(N>1&&turn<N&&cover&&!over&&!busy)h+=`<div class="ov"><h2>${name(turn)} の番です</h2><div>他の人は画面を見ないでください</div><button onclick="reveal()">手札を見る</button></div>`;
   if(over)h+=`<div class="ov"><h2>結果発表</h2><div class="res">${finished.map((p,i)=>`${TITLES[i]}: ${name(p)}`).join('<br>')}</div><button onclick="start(N,1)">もう一度</button><button class="sub" onclick="started=false;render()">人数を選び直す</button></div>`;
   if(confirmQuit)h+=`<div class="ov" style="z-index:9"><h2>ゲームを中断します。<br>よろしいですか？</h2><div>中断すると、タイトル画面に戻ります</div><div class="btns"><button onclick="quitYes()">はい</button><button class="sub" onclick="quitNo()">いいえ</button></div></div>`;
   $.innerHTML=h;
+  if(flyFrom>=0){const s=$.querySelector&&$.querySelector('.s'+flyFrom+' .face');if(s&&s.animate){const sr=s.getBoundingClientRect();$.querySelectorAll('.fld .cur .card').forEach((el,i)=>{const r=el.getBoundingClientRect();el.animate([{transform:`translate(${sr.left+sr.width/2-r.left-r.width/2}px,${sr.top+sr.height/2-r.top-r.height/2}px) scale(.5) rotate(${(i%2?1:-1)*25}deg)`,opacity:.2},{transform:'none',opacity:1}],{duration:480,delay:i*70,easing:'cubic-bezier(.2,.8,.3,1)',fill:'backwards'})})}flyFrom=-1}
 }
 render();
 </script>
